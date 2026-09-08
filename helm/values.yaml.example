@@ -1,0 +1,16 @@
+images:
+  world: quay.io/rhkp/hbr-drone-world:v0.1.0
+  observer: quay.io/rhkp/hbr-drone-observer:v0.1.0
+  zenoh: quay.io/rhkp/hbr-zenoh-router:v0.1.0
+  pullPolicy: IfNotPresent
+
+scenario: all
+artifactDir: /artifacts
+storage:
+  size: 1Gi
+  className: ""
+
+zenoh:
+  servicePort: 7447
+
+resources: {}

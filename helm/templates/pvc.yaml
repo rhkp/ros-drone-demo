@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "ros-drone-demo.fullname" . }}-artifacts
+  labels:
+    {{- include "ros-drone-demo.labels" . | nindent 4 }}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: {{ .Values.storage.size }}
+  {{- with .Values.storage.className }}
+  storageClassName: {{ . | quote }}
+  {{- end }}

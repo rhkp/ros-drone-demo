@@ -1,0 +1,33 @@
+ARG REGISTRY=quay.io/rhkp
+ARG BASE_TAG=v0.1.0
+ARG BOOTC_OS_IMAGE=quay.io/hummingbird-community/bootc-os:latest
+FROM ${REGISTRY}/hbr-ros-base:${BASE_TAG} AS build
+
+USER 0
+ARG ROS_DISTRO=jazzy
+RUN micromamba install -y -n ros_env -c robostack-${ROS_DISTRO} -c conda-forge pyyaml && \
+    micromamba clean -a -y
+COPY ros_ws/src /opt/drone_ws/src
+RUN bash -c "source ${ROS_ENV_SETUP} && colcon build --base-paths /opt/drone_ws/src --merge-install --install-base /opt/drone_ws/install"
+
+FROM ${BOOTC_OS_IMAGE}
+
+USER 0
+RUN mkdir -p /opt/drone_ws /opt/drone-demo/config /opt/drone-demo/scripts /opt/drone/.ros/log
+COPY --from=build /opt/drone_ws/install /opt/drone_ws/install
+COPY --from=build /opt/micromamba /opt/micromamba
+COPY config/scenarios.yaml /opt/drone-demo/config/scenarios.yaml
+COPY scripts/launch-observer.sh /opt/drone-demo/scripts/launch-observer.sh
+COPY images/drone-observer/ros-env.sh /opt/drone/scripts/ros-env.sh
+RUN chmod 0755 /opt/drone-demo/scripts/launch-observer.sh /opt/drone/scripts/ros-env.sh && \
+    chown -R 1001:0 /opt/drone_ws /opt/drone-demo /opt/drone && \
+    chmod -R g=u /opt/drone_ws /opt/drone-demo /opt/drone
+
+ENV MAMBA_ROOT_PREFIX=/opt/micromamba
+ENV PATH=/opt/micromamba/envs/ros_env/bin:/usr/local/bin:${PATH}
+ENV ROS_ENV_SETUP=/opt/micromamba/envs/ros_env/setup.bash
+ENV ROS_LOG_DIR=/opt/drone/.ros/log
+ENV HOME=/opt/drone
+USER 1001
+
+ENTRYPOINT ["/opt/drone-demo/scripts/launch-observer.sh"]

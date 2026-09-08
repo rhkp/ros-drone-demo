@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ros-drone-demo.fullname" . }}-world
+  labels:
+    {{- include "ros-drone-demo.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "ros-drone-demo.name" . }}-world
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "ros-drone-demo.name" . }}-world
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: world
+          image: {{ .Values.images.world | quote }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          env:
+            - name: RMW_IMPLEMENTATION
+              value: rmw_zenoh_cpp
+            - name: ZENOH_ROUTER_ENDPOINT
+              value: tcp/{{ include "ros-drone-demo.fullname" . }}-zenoh:{{ .Values.zenoh.servicePort }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

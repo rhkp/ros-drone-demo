@@ -1,0 +1,33 @@
+<?xml version="1.0" ?>
+<sdf version="1.9">
+  <world name="farm_survey">
+    <gravity>0 0 -9.81</gravity>
+    <physics name="default_physics" type="ode"><max_step_size>0.004</max_step_size><real_time_factor>1</real_time_factor></physics>
+    <scene><ambient>0.55 0.55 0.55 1</ambient><background>0.55 0.75 0.95 1</background><shadows>true</shadows></scene>
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <light name="sun" type="directional"><cast_shadows>true</cast_shadows><pose>0 0 30 0 0 0</pose><diffuse>0.9 0.9 0.8 1</diffuse><direction>-0.4 0.2 -1</direction></light>
+    <model name="farm_ground" static="true">
+      <link name="link"><collision name="collision"><geometry><box><size>80 60 0.2</size></box></geometry></collision><visual name="visual"><geometry><box><size>80 60 0.2</size></box></geometry><material><ambient>0.24 0.52 0.18 1</ambient><diffuse>0.32 0.65 0.23 1</diffuse></material></visual></link>
+    </model>
+
+    <!-- Farmhouse and utility scenery -->
+    <model name="farmhouse" static="true"><pose>-28 18 2 0 0 0</pose><link name="link"><visual name="body"><geometry><box><size>10 7 4</size></box></geometry><material><diffuse>0.82 0.72 0.52 1</diffuse></material></visual><visual name="roof"><pose>0 0 2.8 0 0 0.785</pose><geometry><box><size>8 8 0.5</size></box></geometry><material><diffuse>0.55 0.16 0.08 1</diffuse></material></visual></link></model>
+    <model name="well_north" static="true"><pose>-18 10 0.7 0 0 0</pose><link name="link"><visual name="ring"><geometry><cylinder><radius>1.2</radius><length>1.4</length></cylinder></geometry><material><diffuse>0.55 0.55 0.58 1</diffuse></material></visual><visual name="roof"><pose>0 0 2 0 0 0</pose><geometry><box><size>3 2 0.2</size></box></geometry><material><diffuse>0.25 0.12 0.05 1</diffuse></material></visual></link></model>
+    <model name="cattle_shed_west" static="true"><pose>0 10 2 0 0 0</pose><link name="link"><visual name="body"><geometry><box><size>10 6 4</size></box></geometry><material><diffuse>0.65 0.2 0.12 1</diffuse></material></visual><visual name="roof"><pose>0 0 2.5 0 0 0</pose><geometry><box><size>11 7 0.3</size></box></geometry><material><diffuse>0.2 0.12 0.08 1</diffuse></material></visual></link></model>
+    <model name="storage_silo_east" static="true"><pose>17 8 3 0 0 0</pose><link name="link"><visual name="tank"><geometry><cylinder><radius>2.2</radius><length>6</length></cylinder></geometry><material><diffuse>0.72 0.74 0.75 1</diffuse></material></visual><visual name="cap"><pose>0 0 3.3 0 0 0</pose><geometry><sphere><radius>2.25</radius></sphere></geometry><material><diffuse>0.6 0.62 0.65 1</diffuse></material></visual></link></model>
+    <model name="produce_barn_south" static="true"><pose>18 -10 2 0 0 0</pose><link name="link"><visual name="body"><geometry><box><size>12 8 4</size></box></geometry><material><diffuse>0.7 0.1 0.08 1</diffuse></material></visual><visual name="roof"><pose>0 0 2.7 0 0 0</pose><geometry><box><size>13 9 0.3</size></box></geometry><material><diffuse>0.2 0.1 0.05 1</diffuse></material></visual></link></model>
+    <model name="water_tank_northwest" static="true"><pose>-7 -3 3 0 0 0</pose><link name="link"><visual name="tank"><geometry><cylinder><radius>2</radius><length>6</length></cylinder></geometry><material><diffuse>0.15 0.35 0.75 1</diffuse></material></visual><visual name="legs"><pose>0 0 -3.2 0 0 0</pose><geometry><box><size>3 3 0.4</size></box></geometry><material><diffuse>0.25 0.25 0.27 1</diffuse></material></visual></link></model>
+    <model name="greenhouse_southeast" static="true"><pose>8 -12 2 0 0 0</pose><link name="link"><visual name="body"><geometry><box><size>10 6 4</size></box></geometry><material><transparency>0.45</transparency><diffuse>0.55 0.9 0.72 1</diffuse></material></visual></link></model>
+
+    <!-- Crop plots and rows -->
+    <model name="crop_field_central" static="true"><pose>-4 0 0.35 0 0 0</pose><link name="link"><visual name="plot"><geometry><box><size>18 13 0.5</size></box></geometry><material><diffuse>0.3 0.18 0.06 1</diffuse></material></visual></link></model>
+    <model name="crop_rows" static="true"><pose>-4 0 0.9 0 0 0</pose><link name="link"><visual name="rows"><geometry><box><size>16 0.18 1</size></box></geometry><material><diffuse>0.1 0.45 0.08 1</diffuse></material></visual></link></model>
+
+    <!-- Simple fence and tractor make the scene useful beyond detections. -->
+    <model name="tractor" static="true"><pose>-20 -12 1 0 0 0</pose><link name="link"><visual name="body"><geometry><box><size>4 2 1.5</size></box></geometry><material><diffuse>0.85 0.55 0.03 1</diffuse></material></visual></link></model>
+    <model name="fence_north" static="true"><pose>0 22 1 0 0 0</pose><link name="link"><visual name="rail"><geometry><box><size>60 0.2 2</size></box></geometry><material><diffuse>0.35 0.2 0.08 1</diffuse></material></visual></link></model>
+    <model name="observer_drone" static="true"><pose>0 0 12 0 0 0</pose><link name="link"><visual name="body"><geometry><box><size>1.6 1.0 0.3</size></box></geometry><material><diffuse>0.08 0.08 0.1 1</diffuse></material></visual><visual name="arm_x"><geometry><box><size>3.2 0.15 0.12</size></box></geometry><material><diffuse>0.1 0.1 0.12 1</diffuse></material></visual><visual name="arm_y"><geometry><box><size>0.15 2.5 0.12</size></box></geometry><material><diffuse>0.1 0.1 0.12 1</diffuse></material></visual><visual name="camera"><pose>0 0 -0.25 0 0 0</pose><geometry><sphere><radius>0.22</radius></sphere></geometry><material><diffuse>0.05 0.2 0.8 1</diffuse></material></visual></link></model>
+  </world>
+</sdf>

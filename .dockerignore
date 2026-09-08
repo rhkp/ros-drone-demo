@@ -1,0 +1,10 @@
+.git
+.env
+*.pem
+*.key
+helm/values.yaml
+artifacts
+build
+install
+log
+__pycache__

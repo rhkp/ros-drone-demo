@@ -1,0 +1,11 @@
+string mission_id
+string scenario
+---
+bool success
+uint32 detections
+string report_path
+string message
+---
+string phase
+string target_id
+uint32 detections

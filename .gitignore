@@ -1,0 +1,32 @@
+# Local configuration and secrets
+.env
+.env.*
+*.env
+*.env.*
+!.env.example
+!versions.env.example
+values.yaml
+**/values.yaml
+!**/values.yaml.example
+secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+
+# ROS/Python build output
+build/
+install/
+log/
+**/__pycache__/
+*.pyc
+
+# Runtime evidence and local tooling
+artifacts/
+*.log
+.codegraph/
+.claude/
+.DS_Store
+.idea/
+.vscode/
