@@ -37,12 +37,12 @@ class ObserverNode(Node):
         self.create_subscription(Odometry, '/drone/odom', self.on_odom, 10, callback_group=self.callback_group)
         self.server = ActionServer(self, SurveyMission, '/drone/survey', self.execute,
                                    goal_callback=self.accept_goal, callback_group=self.callback_group)
-        self.get_logger().info('Farm observer ready; default scenario: %s', self.default_scenario)
+        self.get_logger().info(f'Farm observer ready; default scenario: {self.default_scenario}')
 
     def accept_goal(self, goal_request):
         scenario = goal_request.scenario or self.default_scenario
         if scenario not in self.config.get('scenarios', {}):
-            self.get_logger().warning('Rejecting unknown scenario: %s', scenario)
+            self.get_logger().warning(f'Rejecting unknown scenario: {scenario}')
             return GoalResponse.REJECT
         return GoalResponse.ACCEPT
 
