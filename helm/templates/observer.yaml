@@ -27,6 +27,14 @@ spec:
               value: {{ .Values.scenario | quote }}
             - name: DRONE_ARTIFACT_DIR
               value: {{ .Values.artifactDir | quote }}
+            - name: DRONE_HOME_X
+              value: "10.0"
+            - name: DRONE_HOME_Y
+              value: "16.0"
+            - name: DRONE_TAKEOFF_ALTITUDE
+              value: "12.0"
+            - name: DRONE_LANDING_ALTITUDE
+              value: "0.6"
             - name: RMW_IMPLEMENTATION
               value: rmw_zenoh_cpp
             - name: ZENOH_ROUTER_ENDPOINT

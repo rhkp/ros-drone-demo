@@ -50,6 +50,11 @@ The survey action runs an explicit mission state machine: `TAKEOFF`, `TRANSIT`,
 failure enters `EMERGENCY` and attempts a return-to-home and landing sequence.
 The current state is also published on `/drone/mission_state`.
 
+The drone starts and lands at the dedicated `DRONE STATION` deck at
+`farm_map` coordinates `(10, 16)`. The observer and kinematic flight node use
+the same home coordinates, so every normal or emergency return ends at that
+deck rather than inside the crop field.
+
 ## Images and OpenShift
 
 The world image contains only the farm world and Gazebo runtime additions. The observer image contains the ROS package and mission logic. Build and publish them using the project’s validated build VM workflow, for example with the image names in [`versions.env.example`](versions.env.example). The images are intentionally separate so the farm scene and observer behavior can evolve independently.

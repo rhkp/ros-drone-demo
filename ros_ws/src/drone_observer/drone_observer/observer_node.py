@@ -33,14 +33,14 @@ class ObserverNode(Node):
         self.artifact_dir = Path(self.declare_parameter('artifact_dir', os.environ.get('DRONE_ARTIFACT_DIR', '/tmp/drone-artifacts')).value)
         with open(scenario_file, encoding='utf-8') as stream:
             self.config = yaml.safe_load(stream)
-        self.home_x = float(self.declare_parameter('home_x', os.environ.get('DRONE_HOME_X', '0.0')).value)
-        self.home_y = float(self.declare_parameter('home_y', os.environ.get('DRONE_HOME_Y', '0.0')).value)
-        self.takeoff_altitude = float(
-            self.declare_parameter('takeoff_altitude', os.environ.get('DRONE_TAKEOFF_ALTITUDE', '12.0')).value
-        )
-        self.landing_altitude = float(
-            self.declare_parameter('landing_altitude', os.environ.get('DRONE_LANDING_ALTITUDE', '0.6')).value
-        )
+        self.home_x = self.declare_parameter('home_x', float(os.environ.get('DRONE_HOME_X', '0.0'))).value
+        self.home_y = self.declare_parameter('home_y', float(os.environ.get('DRONE_HOME_Y', '0.0'))).value
+        self.takeoff_altitude = self.declare_parameter(
+            'takeoff_altitude', float(os.environ.get('DRONE_TAKEOFF_ALTITUDE', '12.0'))
+        ).value
+        self.landing_altitude = self.declare_parameter(
+            'landing_altitude', float(os.environ.get('DRONE_LANDING_ALTITUDE', '0.6'))
+        ).value
         self.truth = {}
         self.latest_image = None
         self._last_pose = None

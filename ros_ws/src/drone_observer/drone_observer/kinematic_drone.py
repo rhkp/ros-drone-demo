@@ -1,4 +1,5 @@
 import math
+import os
 
 import rclpy
 from geometry_msgs.msg import PoseStamped
@@ -12,11 +13,16 @@ class KinematicDrone(Node):
     def __init__(self):
         super().__init__('kinematic_drone')
         self.speed = self.declare_parameter('speed_mps', 4.0).value
+        self.home_x = self.declare_parameter('home_x', float(os.environ.get('DRONE_HOME_X', '10.0'))).value
+        self.home_y = self.declare_parameter('home_y', float(os.environ.get('DRONE_HOME_Y', '16.0'))).value
+        self.landing_altitude = float(
+            self.declare_parameter('landing_altitude', float(os.environ.get('DRONE_LANDING_ALTITUDE', '0.6'))).value
+        )
         self.gazebo_pose_service = self.declare_parameter(
             'gazebo_pose_service', '/world/farm_survey/set_pose').value
         self.gazebo_entity_name = self.declare_parameter(
             'gazebo_entity_name', 'observer_drone').value
-        self.pose = [0.0, 0.0, 12.0]
+        self.pose = [self.home_x, self.home_y, self.landing_altitude]
         self.target = list(self.pose)
         self._requested_target = None
         self.pose_client = self.create_client(SetEntityPose, self.gazebo_pose_service)
