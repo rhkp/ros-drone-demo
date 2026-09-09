@@ -17,11 +17,46 @@ def write_rgb_png(path, width, height, rgb):
         stream.write(data)
 
 
-def synthetic_rgb(width, height, color=(40, 100, 55)):
-    pixels = bytearray(width * height * 3)
+def image_to_rgb(image):
+    """Convert common ROS image encodings to tightly packed RGB bytes."""
+    encoding = image.encoding.lower()
+    channels = {
+        'rgb8': ('rgb', 3),
+        'bgr8': ('bgr', 3),
+        'rgba8': ('rgba', 4),
+        'bgra8': ('bgra', 4),
+        'mono8': ('mono', 1),
+        '8uc1': ('mono', 1),
+    }.get(encoding)
+    if channels is None:
+        raise ValueError(f'Unsupported camera encoding: {image.encoding}')
+
+    order, bytes_per_pixel = channels
+    width, height = int(image.width), int(image.height)
+    row_bytes = width * bytes_per_pixel
+    stride = int(image.step or row_bytes)
+    raw = bytes(image.data)
+    if len(raw) < stride * height:
+        raise ValueError('Camera image data is shorter than its declared dimensions')
+
+    rgb = bytearray(width * height * 3)
     for y in range(height):
-        for x in range(width):
-            i = (y * width + x) * 3
-            shade = (x * 17 + y * 7) % 24
-            pixels[i:i + 3] = bytes(max(0, min(255, c + shade)) for c in color)
-    return bytes(pixels)
+        source = raw[y * stride:y * stride + row_bytes]
+        destination = y * width * 3
+        if order == 'rgb':
+            rgb[destination:destination + width * 3] = source
+        elif order == 'bgr':
+            for index in range(0, row_bytes, 3):
+                rgb[destination + index:destination + index + 3] = source[index:index + 3][::-1]
+        elif order == 'rgba':
+            for index in range(width):
+                rgb[destination + index * 3:destination + index * 3 + 3] = source[index * 4:index * 4 + 3]
+        elif order == 'bgra':
+            for index in range(width):
+                pixel = source[index * 4:index * 4 + 3]
+                rgb[destination + index * 3:destination + index * 3 + 3] = pixel[::-1]
+        else:
+            for index, value in enumerate(source):
+                offset = destination + index * 3
+                rgb[offset:offset + 3] = bytes((value, value, value))
+    return bytes(rgb)

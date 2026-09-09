@@ -6,11 +6,17 @@
     <scene><ambient>0.55 0.55 0.55 1</ambient><background>0.55 0.75 0.95 1</background><shadows>true</shadows></scene>
     <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
     <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors"/>
     <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
     <light name="sun" type="directional"><cast_shadows>true</cast_shadows><pose>0 0 30 0 0 0</pose><diffuse>0.9 0.9 0.8 1</diffuse><direction>-0.4 0.2 -1</direction></light>
     <model name="farm_ground"><static>true</static>
       <link name="link"><collision name="collision"><geometry><box><size>80 60 0.2</size></box></geometry></collision><visual name="visual"><geometry><box><size>80 60 0.2</size></box></geometry><material><ambient>0.24 0.52 0.18 1</ambient><diffuse>0.32 0.65 0.23 1</diffuse></material></visual></link>
     </model>
+
+    <!-- Layered surfaces make the aerial view read as a cultivated farm. -->
+    <model name="farm_dirt_road"><static>true</static><pose>0 -21 0.13 0 0 0</pose><link name="link"><visual name="road"><geometry><box><size>68 6 0.08</size></box></geometry><material><ambient>0.34 0.20 0.09 1</ambient><diffuse>0.46 0.29 0.13 1</diffuse><specular>0.08 0.05 0.02 1</specular></material></visual><visual name="left_track"><pose>0 -1.55 0.06 0 0 0</pose><geometry><box><size>66 0.55 0.03</size></box></geometry><material><diffuse>0.25 0.14 0.06 1</diffuse></material></visual><visual name="right_track"><pose>0 1.55 0.06 0 0 0</pose><geometry><box><size>66 0.55 0.03</size></box></geometry><material><diffuse>0.25 0.14 0.06 1</diffuse></material></visual></link></model>
+    <model name="farm_yard"><static>true</static><pose>25 1 0.14 0 0 0</pose><link name="link"><visual name="yard"><geometry><box><size>14 16 0.08</size></box></geometry><material><ambient>0.42 0.40 0.32 1</ambient><diffuse>0.58 0.55 0.43 1</diffuse><specular>0.12 0.12 0.1 1</specular></material></visual><visual name="yard_strip"><pose>0 -5 0.06 0 0 0</pose><geometry><box><size>13 0.35 0.03</size></box></geometry><material><diffuse>0.31 0.28 0.2 1</diffuse></material></visual></link></model>
+    <model name="south_field_border"><static>true</static><pose>-4 -8 0.15 0 0 0</pose><link name="link"><visual name="grass_edge"><geometry><box><size>19 0.35 0.08</size></box></geometry><material><diffuse>0.12 0.34 0.08 1</diffuse></material></visual></link></model>
 
     <!-- Farmhouse and utility scenery -->
     <model name="farmhouse"><static>true</static><pose>-28 18 2 0 0 0</pose><link name="link"><visual name="body"><geometry><box><size>10 7 4</size></box></geometry><material><diffuse>0.82 0.72 0.52 1</diffuse></material></visual><visual name="roof"><pose>0 0 2.8 0 0 0.785</pose><geometry><box><size>8 8 0.5</size></box></geometry><material><diffuse>0.55 0.16 0.08 1</diffuse></material></visual></link></model>
@@ -23,11 +29,67 @@
 
     <!-- Crop plots and rows -->
     <model name="crop_field_central"><static>true</static><pose>-4 0 0.35 0 0 0</pose><link name="link"><visual name="plot"><geometry><box><size>18 13 0.5</size></box></geometry><material><diffuse>0.3 0.18 0.06 1</diffuse></material></visual></link></model>
-    <model name="crop_rows"><static>true</static><pose>-4 0 0.9 0 0 0</pose><link name="link"><visual name="rows"><geometry><box><size>16 0.18 1</size></box></geometry><material><diffuse>0.1 0.45 0.08 1</diffuse></material></visual></link></model>
+    <model name="crop_rows"><static>true</static><pose>-4 0 0.9 0 0 0</pose><link name="link"><visual name="row01"><pose>0 -5.5 0 0 0 0</pose><geometry><box><size>16 0.22 1</size></box></geometry><material><diffuse>0.08 0.32 0.05 1</diffuse></material></visual><visual name="row02"><pose>0 -4.5 0 0 0 0</pose><geometry><box><size>16 0.22 1</size></box></geometry><material><diffuse>0.12 0.45 0.07 1</diffuse></material></visual><visual name="row03"><pose>0 -3.5 0 0 0 0</pose><geometry><box><size>16 0.22 1</size></box></geometry><material><diffuse>0.08 0.35 0.05 1</diffuse></material></visual><visual name="row04"><pose>0 -2.5 0 0 0 0</pose><geometry><box><size>16 0.22 1</size></box></geometry><material><diffuse>0.14 0.48 0.08 1</diffuse></material></visual><visual name="row05"><pose>0 -1.5 0 0 0 0</pose><geometry><box><size>16 0.22 1</size></box></geometry><material><diffuse>0.08 0.34 0.05 1</diffuse></material></visual><visual name="row06"><pose>0 -0.5 0 0 0 0</pose><geometry><box><size>16 0.22 1</size></box></geometry><material><diffuse>0.12 0.44 0.06 1</diffuse></material></visual><visual name="row07"><pose>0 0.5 0 0 0 0</pose><geometry><box><size>16 0.22 1</size></box></geometry><material><diffuse>0.08 0.32 0.05 1</diffuse></material></visual><visual name="row08"><pose>0 1.5 0 0 0 0</pose><geometry><box><size>16 0.22 1</size></box></geometry><material><diffuse>0.14 0.48 0.08 1</diffuse></material></visual><visual name="row09"><pose>0 2.5 0 0 0 0</pose><geometry><box><size>16 0.22 1</size></box></geometry><material><diffuse>0.08 0.35 0.05 1</diffuse></material></visual><visual name="row10"><pose>0 3.5 0 0 0 0</pose><geometry><box><size>16 0.22 1</size></box></geometry><material><diffuse>0.12 0.45 0.07 1</diffuse></material></visual><visual name="row11"><pose>0 4.5 0 0 0 0</pose><geometry><box><size>16 0.22 1</size></box></geometry><material><diffuse>0.08 0.32 0.05 1</diffuse></material></visual><visual name="row12"><pose>0 5.5 0 0 0 0</pose><geometry><box><size>16 0.22 1</size></box></geometry><material><diffuse>0.14 0.48 0.08 1</diffuse></material></visual></link></model>
+
+    <!-- Orchard, hay, and field-edge details. -->
+    <model name="orchard"><static>true</static><pose>28 -12 0 0 0 0</pose><link name="link"><visual name="trunk01"><pose>-8 0 1.6 0 0 0</pose><geometry><cylinder><radius>0.35</radius><length>3.2</length></cylinder></geometry><material><diffuse>0.25 0.1 0.03 1</diffuse></material></visual><visual name="canopy01"><pose>-8 0 3.5 0 0 0</pose><geometry><sphere><radius>2.1</radius></sphere></geometry><material><ambient>0.05 0.2 0.03 1</ambient><diffuse>0.12 0.42 0.05 1</diffuse></material></visual><visual name="trunk02"><pose>-2 2 1.6 0 0 0</pose><geometry><cylinder><radius>0.35</radius><length>3.2</length></cylinder></geometry><material><diffuse>0.25 0.1 0.03 1</diffuse></material></visual><visual name="canopy02"><pose>-2 2 3.5 0 0 0</pose><geometry><sphere><radius>2.0</radius></sphere></geometry><material><diffuse>0.14 0.46 0.06 1</diffuse></material></visual><visual name="trunk03"><pose>5 -1 1.6 0 0 0</pose><geometry><cylinder><radius>0.35</radius><length>3.2</length></cylinder></geometry><material><diffuse>0.25 0.1 0.03 1</diffuse></material></visual><visual name="canopy03"><pose>5 -1 3.5 0 0 0</pose><geometry><sphere><radius>2.2</radius></sphere></geometry><material><diffuse>0.1 0.38 0.04 1</diffuse></material></visual><visual name="trunk04"><pose>10 2 1.6 0 0 0</pose><geometry><cylinder><radius>0.35</radius><length>3.2</length></cylinder></geometry><material><diffuse>0.25 0.1 0.03 1</diffuse></material></visual><visual name="canopy04"><pose>10 2 3.5 0 0 0</pose><geometry><sphere><radius>2.0</radius></sphere></geometry><material><diffuse>0.15 0.48 0.06 1</diffuse></material></visual></link></model>
+    <model name="hay_bales"><static>true</static><pose>28 6 0 0 0 0</pose><link name="link"><visual name="bale01"><pose>-3 0 1 0 1.5708 0</pose><geometry><cylinder><radius>1</radius><length>2</length></cylinder></geometry><material><ambient>0.52 0.34 0.08 1</ambient><diffuse>0.78 0.58 0.2 1</diffuse></material></visual><visual name="bale02"><pose>0 0 1 0 1.5708 0</pose><geometry><cylinder><radius>1</radius><length>2</length></cylinder></geometry><material><diffuse>0.68 0.46 0.12 1</diffuse></material></visual><visual name="bale03"><pose>3 0 1 0 1.5708 0</pose><geometry><cylinder><radius>1</radius><length>2</length></cylinder></geometry><material><diffuse>0.82 0.62 0.23 1</diffuse></material></visual><visual name="bale04"><pose>-1.5 2 2.8 0 1.5708 0</pose><geometry><cylinder><radius>1</radius><length>2</length></cylinder></geometry><material><diffuse>0.72 0.5 0.14 1</diffuse></material></visual><visual name="bale05"><pose>1.5 2 2.8 0 1.5708 0</pose><geometry><cylinder><radius>1</radius><length>2</length></cylinder></geometry><material><diffuse>0.8 0.6 0.2 1</diffuse></material></visual></link></model>
+
+    <!-- Farm architecture details: openings, silo ribs, and livestock pen. -->
+    <model name="farmhouse_details"><static>true</static><pose>-28 14.45 2 0 0 0</pose><link name="link"><visual name="door"><pose>0 0 0 0 0 0</pose><geometry><box><size>1.8 0.12 2.8</size></box></geometry><material><diffuse>0.25 0.1 0.04 1</diffuse></material></visual><visual name="window_left"><pose>-3 0.08 0.5 0 0 0</pose><geometry><box><size>1.4 0.12 1.2</size></box></geometry><material><ambient>0.04 0.13 0.2 1</ambient><diffuse>0.08 0.35 0.55 1</diffuse></material></visual><visual name="window_right"><pose>3 0.08 0.5 0 0 0</pose><geometry><box><size>1.4 0.12 1.2</size></box></geometry><material><ambient>0.04 0.13 0.2 1</ambient><diffuse>0.08 0.35 0.55 1</diffuse></material></visual><visual name="chimney"><pose>3 0 3.4 0 0 0</pose><geometry><box><size>0.8 0.8 1.8</size></box></geometry><material><diffuse>0.35 0.12 0.06 1</diffuse></material></visual></link></model>
+    <model name="silo_bands"><static>true</static><pose>17 8 3 0 0 0</pose><link name="link"><visual name="band01"><pose>0 0 -2 0 0 0</pose><geometry><cylinder><radius>2.24</radius><length>0.08</length></cylinder></geometry><material><diffuse>0.32 0.35 0.37 1</diffuse></material></visual><visual name="band02"><pose>0 0 0 0 0 0</pose><geometry><cylinder><radius>2.24</radius><length>0.08</length></cylinder></geometry><material><diffuse>0.32 0.35 0.37 1</diffuse></material></visual><visual name="band03"><pose>0 0 2 0 0 0</pose><geometry><cylinder><radius>2.24</radius><length>0.08</length></cylinder></geometry><material><diffuse>0.32 0.35 0.37 1</diffuse></material></visual></link></model>
+    <model name="cattle_pen"><static>true</static><pose>-1 14 0.8 0 0 0</pose><link name="link"><visual name="rail01"><pose>0 0 0 0 0 0</pose><geometry><box><size>12 0.15 1.6</size></box></geometry><material><diffuse>0.3 0.14 0.04 1</diffuse></material></visual><visual name="rail02"><pose>0 0 0.65 0 0 0</pose><geometry><box><size>12 0.15 0.15</size></box></geometry><material><diffuse>0.38 0.18 0.05 1</diffuse></material></visual><visual name="rail03"><pose>0 0 -0.65 0 0 0</pose><geometry><box><size>12 0.15 0.15</size></box></geometry><material><diffuse>0.38 0.18 0.05 1</diffuse></material></visual></link></model>
 
     <!-- Simple fence and tractor make the scene useful beyond detections. -->
     <model name="tractor"><static>true</static><pose>-20 -12 1 0 0 0</pose><link name="link"><visual name="body"><geometry><box><size>4 2 1.5</size></box></geometry><material><diffuse>0.85 0.55 0.03 1</diffuse></material></visual></link></model>
     <model name="fence_north"><static>true</static><pose>0 22 1 0 0 0</pose><link name="link"><visual name="rail"><geometry><box><size>60 0.2 2</size></box></geometry><material><diffuse>0.35 0.2 0.08 1</diffuse></material></visual></link></model>
-    <model name="observer_drone"><static>true</static><pose>0 0 12 0 0 0</pose><link name="link"><visual name="body"><geometry><box><size>1.6 1.0 0.3</size></box></geometry><material><diffuse>0.08 0.08 0.1 1</diffuse></material></visual><visual name="arm_x"><geometry><box><size>3.2 0.15 0.12</size></box></geometry><material><diffuse>0.1 0.1 0.12 1</diffuse></material></visual><visual name="arm_y"><geometry><box><size>0.15 2.5 0.12</size></box></geometry><material><diffuse>0.1 0.1 0.12 1</diffuse></material></visual><visual name="camera"><pose>0 0 -0.25 0 0 0</pose><geometry><sphere><radius>0.22</radius></sphere></geometry><material><diffuse>0.05 0.2 0.8 1</diffuse></material></visual></link></model>
+    <model name="observer_drone">
+      <static>false</static>
+      <self_collide>false</self_collide>
+      <allow_auto_disable>false</allow_auto_disable>
+      <pose>0 0 12 0 0 0</pose>
+      <!--
+      <link name="link">
+        <gravity>false</gravity>
+        <visual name="body"><geometry><box><size>1.6 1.0 0.3</size></box></geometry><material><ambient>0.03 0.03 0.04 1</ambient><diffuse>0.08 0.08 0.1 1</diffuse><specular>0.6 0.6 0.65 1</specular></material></visual>
+        <visual name="arm_x"><geometry><box><size>3.2 0.15 0.12</size></box></geometry><material><diffuse>0.1 0.1 0.12 1</diffuse></material></visual>
+        <visual name="arm_y"><geometry><box><size>0.15 2.5 0.12</size></box></geometry><material><diffuse>0.1 0.1 0.12 1</diffuse></material></visual>
+        <visual name="camera"><pose>0 0 -0.34 0 0 0</pose><geometry><sphere><radius>0.22</radius></geometry></visual><material><diffuse>0.05 0.2 0.8 1</diffuse></material></visual>
+        <sensor name="downward_camera" type="camera">
+          <pose>0 0 -0.36 0 1.5708 0</pose>
+          <camera>
+            <horizontal_fov>1.0472</horizontal_fov>
+            <image><width>320</width><height>240</height><format>R8G8B8</format></image>
+            <clip><near>0.1</near><far>100</far></clip>
+            <camera_info_topic>/drone/camera/camera_info</camera_info_topic>
+          </camera>
+          <always_on>true</always_on>
+          <update_rate>5</update_rate>
+          <visualize>true</visualize>
+          <topic>/drone/camera/image_raw</topic>
+        </sensor>
+      </link>
+      -->
+      <link name="link">
+        <gravity>false</gravity>
+        <visual name="body"><geometry><box><size>1.6 1.0 0.3</size></box></geometry><material><ambient>0.03 0.03 0.04 1</ambient><diffuse>0.08 0.08 0.1 1</diffuse><specular>0.6 0.6 0.65 1</specular></material></visual>
+        <visual name="arm_x"><geometry><box><size>3.2 0.15 0.12</size></box></geometry><material><diffuse>0.1 0.1 0.12 1</diffuse></material></visual>
+        <visual name="arm_y"><geometry><box><size>0.15 2.5 0.12</size></box></geometry><material><diffuse>0.1 0.1 0.12 1</diffuse></material></visual>
+        <visual name="camera"><pose>0 0 -0.34 0 0 0</pose><geometry><sphere><radius>0.22</radius></sphere></geometry><material><diffuse>0.05 0.2 0.8 1</diffuse></material></visual>
+        <sensor name="downward_camera" type="camera">
+          <pose>0 0 -0.36 0 1.5708 0</pose>
+          <camera>
+            <horizontal_fov>1.0472</horizontal_fov>
+            <image><width>320</width><height>240</height><format>R8G8B8</format></image>
+            <clip><near>0.1</near><far>100</far></clip>
+            <camera_info_topic>/drone/camera/camera_info</camera_info_topic>
+          </camera>
+          <always_on>true</always_on>
+          <update_rate>5</update_rate>
+          <visualize>true</visualize>
+          <topic>/drone/camera/image_raw</topic>
+        </sensor>
+      </link>
+    </model>
   </world>
 </sdf>

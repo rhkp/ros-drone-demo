@@ -16,7 +16,7 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from sensor_msgs.msg import Image
 
-from .image_utils import synthetic_rgb, write_rgb_png
+from .image_utils import image_to_rgb, write_rgb_png
 
 
 class ObserverNode(Node):
@@ -120,10 +120,14 @@ class ObserverNode(Node):
     def _capture(self, mission_id, target_id):
         path = self.artifact_dir / mission_id / f'{target_id}.png'
         path.parent.mkdir(parents=True, exist_ok=True)
-        if self.latest_image and self.latest_image.encoding == 'rgb8' and self.latest_image.step == self.latest_image.width * 3:
-            write_rgb_png(path, self.latest_image.width, self.latest_image.height, bytes(self.latest_image.data))
-        else:
-            write_rgb_png(path, 320, 240, synthetic_rgb(320, 240))
+        if self.latest_image is None:
+            raise RuntimeError('No rendered Gazebo camera frame is available')
+        write_rgb_png(
+            path,
+            int(self.latest_image.width),
+            int(self.latest_image.height),
+            image_to_rgb(self.latest_image),
+        )
         return path
 
     def _publish_detections(self, detections):

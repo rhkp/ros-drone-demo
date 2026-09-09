@@ -1,6 +1,6 @@
 # ROS Farm Survey Drone Demo
 
-A ROS 2 and Gazebo farm simulation in which one observer drone surveys farm assets, captures evidence images, and publishes structured detections.
+A ROS 2 and Gazebo farm simulation in which one observer drone surveys farm assets, captures rendered evidence images, and publishes structured detections.
 
 The demo scenario contains:
 
@@ -17,7 +17,8 @@ The five core detection types are `well`, `storage_silo`, `cattle_shed`, `produc
 
 - `worlds/` — farm world definition.
 - `ros_ws/src/drone_observer_msgs/` — reusable truth, detection, and survey action interfaces.
-- `ros_ws/src/drone_observer/` — kinematic drone, camera simulator, truth publisher, and observer action server.
+- `ros_ws/src/drone_observer/` — waypoint controller, rendered-camera subscriber, truth publisher, and observer action server.
+- `scripts/launch-world.sh` — Gazebo startup plus ROS-Gazebo image and pose bridges.
 - `images/` — separate world and observer image definitions.
 - `helm/` — OpenShift/Kubernetes deployment with Zenoh connectivity and evidence PVC.
 
@@ -41,6 +42,8 @@ source install/setup.bash
 ```
 
 Evidence and `report.json` are written below `artifacts/` by default.
+
+The farm world contains the moving `observer_drone` model and a downward-facing Gazebo camera sensor. The world image bridges rendered camera frames to `/drone/camera/image_raw` and exposes `/world/farm_survey/set_pose`; the observer uses that service to keep the visible drone model synchronized with each waypoint. Evidence capture fails if no rendered frame is available.
 
 ## Images and OpenShift
 

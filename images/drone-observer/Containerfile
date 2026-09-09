@@ -5,7 +5,7 @@ FROM ${REGISTRY}/hbr-ros-base:${BASE_TAG} AS build
 
 USER 0
 ARG ROS_DISTRO=jazzy
-RUN micromamba install -y -n ros_env -c robostack-${ROS_DISTRO} -c conda-forge pyyaml && \
+RUN micromamba install -y -n ros_env -c robostack-${ROS_DISTRO} -c conda-forge pyyaml ros-${ROS_DISTRO}-ros-gz-interfaces && \
     micromamba clean -a -y
 COPY ros_ws/src /opt/drone_ws/src
 RUN bash -c "source ${ROS_ENV_SETUP} && colcon build --base-paths /opt/drone_ws/src --merge-install --install-base /opt/drone_ws/install"

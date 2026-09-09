@@ -16,7 +16,6 @@ setup(
     zip_safe=True,
     entry_points={
         'console_scripts': [
-            'camera_simulator = drone_observer.camera_simulator:main',
             'kinematic_drone = drone_observer.kinematic_drone:main',
             'observer_node = drone_observer.observer_node:main',
             'truth_publisher = drone_observer.truth_publisher:main',
