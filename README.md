@@ -45,6 +45,11 @@ Evidence and `report.json` are written below `artifacts/` by default.
 
 The farm world contains the moving `observer_drone` model and a downward-facing Gazebo camera sensor. The world image bridges rendered camera frames to `/drone/camera/image_raw` and exposes `/world/farm_survey/set_pose`; the observer uses that service to keep the visible drone model synchronized with each waypoint. Evidence capture fails if no rendered frame is available.
 
+The survey action runs an explicit mission state machine: `TAKEOFF`, `TRANSIT`,
+`INSPECT`, `RETURN`, `LAND`, and `COMPLETE`. Cancellation or a movement/camera
+failure enters `EMERGENCY` and attempts a return-to-home and landing sequence.
+The current state is also published on `/drone/mission_state`.
+
 ## Images and OpenShift
 
 The world image contains only the farm world and Gazebo runtime additions. The observer image contains the ROS package and mission logic. Build and publish them using the project’s validated build VM workflow, for example with the image names in [`versions.env.example`](versions.env.example). The images are intentionally separate so the farm scene and observer behavior can evolve independently.
