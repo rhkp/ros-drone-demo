@@ -1,7 +1,8 @@
 images:
-  world: quay.io/rhkp/hbr-drone-world:v0.1.0
+  world: quay.io/rhkp/hbr-drone-world:v0.1.1
   observer: quay.io/rhkp/hbr-drone-observer:v0.1.0
   zenoh: quay.io/rhkp/hbr-zenoh-router:v0.1.0
+  novnc: quay.io/rhkp/hbr-novnc:v0.1.0
   pullPolicy: IfNotPresent
 
 scenario: all
@@ -12,5 +13,12 @@ storage:
 
 zenoh:
   servicePort: 7447
+
+gui:
+  enabled: true
+  display: :99
+  screen: 1280x800x24
+  vncPort: 5900
+  novncPort: 8080
 
 resources: {}

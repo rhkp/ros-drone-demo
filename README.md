@@ -55,4 +55,21 @@ helm upgrade --install ros-drone-demo ./helm \
   --namespace ros-drone-demo --create-namespace --wait
 ```
 
+The example enables the private noVNC viewer. Forward it locally instead of exposing
+the VNC service publicly:
+
+```bash
+oc port-forward -n ros-drone-demo svc/ros-drone-demo-ros-drone-demo-novnc 6080:8080
+```
+
+Open `http://127.0.0.1:6080/vnc.html` to view Gazebo. Survey evidence is stored on
+the observer PVC and can be downloaded after a mission with:
+
+```bash
+POD=$(oc get pod -n ros-drone-demo \
+  -l app.kubernetes.io/name=ros-drone-demo-observer \
+  -o jsonpath='{.items[0].metadata.name}')
+oc cp -n ros-drone-demo "$POD:/artifacts/<mission-id>" ./artifacts/<mission-id>
+```
+
 Copy `helm/values.yaml.example` to a local, ignored `helm/values.yaml` before deployment. Never commit that copy, `.env`, cloud credentials, registry credentials, private keys, or other sensitive files. The committed example files contain only public placeholder configuration.

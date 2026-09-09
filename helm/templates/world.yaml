@@ -25,5 +25,40 @@ spec:
               value: rmw_zenoh_cpp
             - name: ZENOH_ROUTER_ENDPOINT
               value: tcp/{{ include "ros-drone-demo.fullname" . }}-zenoh:{{ .Values.zenoh.servicePort }}
+            {{- if and .Values.gui .Values.gui.enabled }}
+            - name: DRONE_GUI
+              value: "true"
+            - name: DISPLAY
+              value: {{ .Values.gui.display | quote }}
+            {{- end }}
+          {{- if and .Values.gui .Values.gui.enabled }}
+          command: ["/bin/bash", "-lc"]
+          args:
+            - >-
+              Xvfb {{ .Values.gui.display }} -screen 0 {{ .Values.gui.screen }} -ac >/tmp/drone-xvfb.log 2>&1 &
+              DISPLAY={{ .Values.gui.display }} x11vnc -display {{ .Values.gui.display }} -forever -shared
+              -rfbport {{ .Values.gui.vncPort }} -listen 0.0.0.0 -nopw >/tmp/drone-x11vnc.log 2>&1 &
+              exec /opt/drone-demo/scripts/launch-world.sh
+          ports:
+            - name: vnc
+              containerPort: {{ .Values.gui.vncPort }}
+          {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+---
+{{- if and .Values.gui .Values.gui.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ros-drone-demo.fullname" . }}-world
+  labels:
+    {{- include "ros-drone-demo.labels" . | nindent 4 }}
+spec:
+  selector:
+    app.kubernetes.io/name: {{ include "ros-drone-demo.name" . }}-world
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: vnc
+      port: {{ .Values.gui.vncPort }}
+      targetPort: vnc
+{{- end }}
