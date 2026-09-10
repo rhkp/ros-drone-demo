@@ -58,6 +58,11 @@ The navigation layer validates every route against the configured geofence and
 publishes normalized execution progress on `/drone/navigation_progress`. It can
 also route around configurable axis-aligned `no_fly_zones` without changing
 the farm world or its target coordinates.
+Runtime obstacle centers may be supplied as a `geometry_msgs/PoseArray` on
+`/drone/dynamic_obstacles`. Each pose is expanded using the configured
+`dynamic_obstacles` dimensions, stale feeds expire automatically, and an active
+mission safely replans around newly blocked segments. Replan events are recorded
+in the mission report for verification.
 
 The drone starts and lands at the dedicated `DRONE STATION` deck at
 `farm_map` coordinates `(10, 16)`. The observer and kinematic flight node use

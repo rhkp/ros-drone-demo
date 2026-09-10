@@ -1,10 +1,15 @@
 import math
+import threading
 import time
 from dataclasses import dataclass
 
 
 class NavigationCanceled(Exception):
     """Raised when a flight goal is canceled while moving."""
+
+
+class NavigationReplan(Exception):
+    """Raised internally when a newly reported obstacle blocks a segment."""
 
 
 @dataclass(frozen=True)
@@ -112,7 +117,8 @@ class ObstacleZone:
     def detour_for_segment(self, start, end):
         if not self.intersects(start, end):
             return None
-        if self._contains_xy(start) or self._contains_xy(end):
+        start_inside = self._contains_xy(start)
+        if self._contains_xy(end):
             raise ValueError(f'Route enters obstacle zone: {self.zone_id}')
 
         min_x, max_x = self.min_x - self.margin, self.max_x + self.margin
@@ -126,7 +132,11 @@ class ObstacleZone:
         edges = {index: [] for index in range(len(nodes))}
         for left in range(len(nodes)):
             for right in range(left + 1, len(nodes)):
-                if self._crosses_open_rectangle(nodes[left], nodes[right], min_x, max_x, min_y, max_y):
+                crosses_zone = self._crosses_open_rectangle(
+                    nodes[left], nodes[right], min_x, max_x, min_y, max_y,
+                )
+                escape_edge = start_inside and left == 0 and right >= 2
+                if crosses_zone and not escape_edge:
                     continue
                 distance = math.dist(nodes[left], nodes[right])
                 edges[left].append((right, distance))
@@ -167,10 +177,27 @@ class FlightNavigator:
         self.get_pose = get_pose
         self.on_progress = on_progress or (lambda _value: None)
         self.geofence = geofence or Geofence.from_mapping({})
-        self.obstacles = tuple(obstacles or ())
+        self.static_obstacles = tuple(obstacles or ())
+        self.dynamic_obstacles = ()
+        self._obstacle_lock = threading.RLock()
+        self.replan_events = []
         self.tolerance = tolerance
         self.update_period = update_period
         self.timeout = timeout
+
+    @property
+    def obstacles(self):
+        with self._obstacle_lock:
+            return self.static_obstacles + self.dynamic_obstacles
+
+    def set_dynamic_obstacles(self, obstacles):
+        """Replace the current runtime obstacle snapshot atomically."""
+        with self._obstacle_lock:
+            self.dynamic_obstacles = tuple(obstacles or ())
+
+    def reset_replan_events(self):
+        with self._obstacle_lock:
+            self.replan_events = []
 
     def validate_route(self, route):
         self.geofence.validate_route(route)
@@ -201,31 +228,75 @@ class FlightNavigator:
         target = tuple(float(value) for value in target)
         self.geofence.validate_pose(target)
         cancel_requested = cancel_requested or (lambda: False)
-        start = self.get_pose() or target
-        path = self.plan_segment(start, target)
-        lengths = [math.dist(left, right) for left, right in zip(path, path[1:])]
-        total_length = sum(lengths) or 1.0
-        traveled = 0.0
-        for index, waypoint in enumerate(path[1:]):
-            segment_start = progress_start + (progress_end - progress_start) * traveled / total_length
-            traveled += lengths[index]
-            segment_end = progress_start + (progress_end - progress_start) * traveled / total_length
-            self._move_to(waypoint, cancel_requested, segment_start, segment_end)
+        self._progress_value = progress_start
+        replan_count = 0
+        deadline = time.monotonic() + self.timeout
+        while True:
+            if time.monotonic() >= deadline:
+                raise TimeoutError(f'Timed out planning route to navigation target {target}')
+            start = self.get_pose() or target
+            path = self.plan_segment(start, target)
+            start_inside_obstacle = any(
+                obstacle._contains_xy(start) for obstacle in self.obstacles
+            )
+            lengths = [math.dist(left, right) for left, right in zip(path, path[1:])]
+            total_length = sum(lengths) or 1.0
+            traveled = 0.0
+            try:
+                for index, waypoint in enumerate(path[1:]):
+                    segment_start = progress_start + (progress_end - progress_start) * traveled / total_length
+                    traveled += lengths[index]
+                    segment_end = progress_start + (progress_end - progress_start) * traveled / total_length
+                    self._move_to(
+                        waypoint, cancel_requested, segment_start, segment_end,
+                        allow_escape=start_inside_obstacle and index == 0,
+                    )
+                return
+            except NavigationReplan as error:
+                replan_count += 1
+                if replan_count > 20:
+                    raise TimeoutError(f'Too many navigation replans while reaching {target}') from error
+                current = self.get_pose() or start
+                with self._obstacle_lock:
+                    blockers = [obstacle.zone_id for obstacle in self.dynamic_obstacles
+                                if obstacle.intersects(current, target)]
+                    self.replan_events.append({
+                        'timestamp': time.time(),
+                        'from': list(current),
+                        'to': list(target),
+                        'obstacles': blockers,
+                    })
 
-    def _move_to(self, target, cancel_requested, progress_start, progress_end):
+    def _move_to(self, target, cancel_requested, progress_start, progress_end,
+                 allow_escape=False):
         initial_pose = self.get_pose()
         initial_distance = math.dist(initial_pose, target) if initial_pose else 0.0
         deadline = time.monotonic() + self.timeout
         while time.monotonic() < deadline:
             if cancel_requested():
                 raise NavigationCanceled()
-            self.publish_setpoint(*target)
             pose = self.get_pose()
+            blocked = False
+            if pose:
+                for obstacle in self.obstacles:
+                    if not obstacle.intersects(pose, target):
+                        continue
+                    if allow_escape and obstacle._contains_xy(pose):
+                        continue
+                    blocked = True
+                    break
+            if blocked:
+                raise NavigationReplan(f'Navigation segment to {target} is blocked')
+            self.publish_setpoint(*target)
             if pose and math.dist(pose, target) < self.tolerance:
-                self.on_progress(progress_end)
+                self._report_progress(progress_end)
                 return
             if pose and initial_distance > self.tolerance:
                 fraction = 1.0 - min(1.0, math.dist(pose, target) / initial_distance)
-                self.on_progress(progress_start + (progress_end - progress_start) * fraction)
+                self._report_progress(progress_start + (progress_end - progress_start) * fraction)
             time.sleep(self.update_period)
         raise TimeoutError(f'Timed out reaching navigation target {target}')
+
+    def _report_progress(self, value):
+        self._progress_value = max(self._progress_value, float(value))
+        self.on_progress(self._progress_value)

@@ -1,6 +1,6 @@
 images:
-  world: quay.io/rhkp/hbr-drone-world:v0.4.0
-  observer: quay.io/rhkp/hbr-drone-observer:v0.4.0
+  world: quay.io/rhkp/hbr-drone-world:v0.5.1
+  observer: quay.io/rhkp/hbr-drone-observer:v0.5.1
   zenoh: quay.io/rhkp/hbr-zenoh-router:v0.1.0
   novnc: quay.io/rhkp/hbr-novnc:v0.1.0
   pullPolicy: IfNotPresent

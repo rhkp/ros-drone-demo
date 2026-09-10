@@ -9,7 +9,7 @@ import rclpy
 import yaml
 from drone_observer_msgs.action import SurveyMission
 from drone_observer_msgs.msg import TargetDetection, TargetDetectionArray, TargetTruthArray
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseArray, PoseStamped
 from nav_msgs.msg import Odometry
 from nav_msgs.msg import Path as NavPath
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
@@ -39,6 +39,16 @@ class ObserverNode(Node):
         navigation_config = self.config.get('navigation', {})
         geofence_config = navigation_config.get('geofence', {})
         obstacles = [ObstacleZone.from_mapping(item) for item in navigation_config.get('no_fly_zones', [])]
+        dynamic_config = navigation_config.get('dynamic_obstacles', {})
+        self.dynamic_obstacles_enabled = bool(dynamic_config.get('enabled', True))
+        self.dynamic_obstacle_topic = str(dynamic_config.get('topic', '/drone/dynamic_obstacles'))
+        self.dynamic_obstacle_half_extent = float(dynamic_config.get('half_extent', 1.5))
+        self.dynamic_obstacle_min_z = float(dynamic_config.get('min_z', 0.0))
+        self.dynamic_obstacle_max_z = float(dynamic_config.get('max_z', 20.0))
+        self.dynamic_obstacle_margin = float(dynamic_config.get('margin', 1.0))
+        self.dynamic_obstacle_ttl = float(dynamic_config.get('ttl_sec', 5.0))
+        self._dynamic_obstacle_received_at = None
+        self._dynamic_obstacle_count = 0
         self.navigation_progress_pub = self.create_publisher(Float32, '/drone/navigation_progress', 10)
         self.navigator = FlightNavigator(
             self.publish_setpoint,
@@ -71,6 +81,12 @@ class ObserverNode(Node):
         self.create_subscription(TargetTruthArray, '/drone/target_truth', self.on_truth, 10, callback_group=self.callback_group)
         self.create_subscription(Image, '/drone/camera/image_raw', self.on_image, 10, callback_group=self.callback_group)
         self.create_subscription(Odometry, '/drone/odom', self.on_odom, 10, callback_group=self.callback_group)
+        if self.dynamic_obstacles_enabled:
+            self.create_subscription(
+                PoseArray, self.dynamic_obstacle_topic, self.on_dynamic_obstacles, 10,
+                callback_group=self.callback_group,
+            )
+            self.create_timer(1.0, self._expire_dynamic_obstacles, callback_group=self.callback_group)
         self.server = ActionServer(self, SurveyMission, '/drone/survey', self.execute,
                                    goal_callback=self.accept_goal, cancel_callback=self.accept_cancel,
                                    callback_group=self.callback_group)
@@ -101,6 +117,35 @@ class ObserverNode(Node):
     def on_odom(self, message):
         position = message.pose.pose.position
         self._last_pose = (position.x, position.y, position.z)
+
+    def on_dynamic_obstacles(self, message):
+        half_extent = self.dynamic_obstacle_half_extent
+        obstacles = []
+        for index, pose in enumerate(message.poses):
+            x, y = pose.position.x, pose.position.y
+            obstacles.append(ObstacleZone(
+                f'dynamic_{index}', x - half_extent, x + half_extent,
+                y - half_extent, y + half_extent,
+                self.dynamic_obstacle_min_z, self.dynamic_obstacle_max_z,
+                self.dynamic_obstacle_margin,
+            ))
+        self.navigator.set_dynamic_obstacles(obstacles)
+        self._dynamic_obstacle_received_at = time.monotonic()
+        if len(obstacles) != self._dynamic_obstacle_count:
+            self._dynamic_obstacle_count = len(obstacles)
+            self.get_logger().info(
+                f'Runtime obstacle feed updated: {self._dynamic_obstacle_count} obstacle(s)'
+            )
+
+    def _expire_dynamic_obstacles(self):
+        if (self._dynamic_obstacle_received_at is None or
+                time.monotonic() - self._dynamic_obstacle_received_at <= self.dynamic_obstacle_ttl):
+            return
+        if self._dynamic_obstacle_count:
+            self.navigator.set_dynamic_obstacles(())
+            self._dynamic_obstacle_count = 0
+            self.get_logger().info('Runtime obstacle feed expired; resuming with static zones only')
+        self._dynamic_obstacle_received_at = None
 
     def publish_setpoint(self, x, y, z):
         message = PoseStamped()
@@ -136,6 +181,7 @@ class ObserverNode(Node):
         planned_route = []
         detections = []
         self._state_history = []
+        self.navigator.reset_replan_events()
         try:
             route = self._build_route(waypoints)
             planned_route = self.navigator.plan_route(route)
@@ -306,6 +352,7 @@ class ObserverNode(Node):
             'planned_route': [
                 {'x': x, 'y': y, 'z': z} for x, y, z in route
             ],
+            'replan_events': list(self.navigator.replan_events),
             'state_history': self._state_history,
             'detections': [
                 {'target_id': item.target_id, 'target_type': item.target_type,
