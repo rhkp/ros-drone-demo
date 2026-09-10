@@ -50,10 +50,19 @@ The survey action runs an explicit mission state machine: `TAKEOFF`, `TRANSIT`,
 failure enters `EMERGENCY` and attempts a return-to-home and landing sequence.
 The current state is also published on `/drone/mission_state`.
 
+Each accepted mission publishes its complete planned 3-D route on
+`/drone/mission_path` as a `nav_msgs/Path`, including takeoff, survey
+waypoints, return, and landing. The same route is recorded in the mission's
+`report.json` under `planned_route` for downstream navigation and audit tools.
+
 The drone starts and lands at the dedicated `DRONE STATION` deck at
 `farm_map` coordinates `(10, 16)`. The observer and kinematic flight node use
 the same home coordinates, so every normal or emergency return ends at that
 deck rather than inside the crop field.
+
+The visible Gazebo model follows the interpolated flight pose continuously,
+with configurable acceleration (`DRONE_ACCELERATION_MPS2`) and cruise speed,
+so waypoint transitions are rendered as smooth flight rather than teleports.
 
 ## Images and OpenShift
 

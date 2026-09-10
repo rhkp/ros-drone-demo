@@ -12,13 +12,13 @@ scenarios:
     waypoints:
       - {x: -4, y: 0, z: 14}
       - {x: 4, y: -5, z: 14}
-      - {x: 12, y: -12, z: 14}
+      - {x: -22, y: 3, z: 14}
   water:
     target_types: [well, water_tank, crop_field]
     waypoints:
       - {x: -18, y: 10, z: 12}
-      - {x: -7, y: -3, z: 14}
-      - {x: 8, y: -12, z: 14}
+      - {x: -20, y: -4, z: 14}
+      - {x: -4, y: 0, z: 14}
   all:
     target_types: [well, storage_silo, cattle_shed, produce_barn, crop_field, greenhouse, water_tank]
     waypoints:
@@ -26,7 +26,7 @@ scenarios:
       - {x: 0, y: 10, z: 12}
       - {x: 17, y: 8, z: 12}
       - {x: -4, y: 0, z: 14}
-      - {x: 8, y: -12, z: 14}
+      - {x: -22, y: 3, z: 14}
       - {x: 18, y: -10, z: 12}
 
 targets:
@@ -35,5 +35,5 @@ targets:
   - {id: cattle_shed_west, type: cattle_shed, x: 0, y: 10, z: 2}
   - {id: produce_barn_south, type: produce_barn, x: 18, y: -10, z: 2}
   - {id: crop_field_central, type: crop_field, x: -4, y: 0, z: 0}
-  - {id: greenhouse_southeast, type: greenhouse, x: 8, y: -12, z: 2}
-  - {id: water_tank_northwest, type: water_tank, x: -7, y: -3, z: 3}
+  - {id: greenhouse_southeast, type: greenhouse, x: -22, y: 3, z: 2}
+  - {id: water_tank_northwest, type: water_tank, x: -20, y: -4, z: 3}

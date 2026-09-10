@@ -12,7 +12,8 @@ from ros_gz_interfaces.srv import SetEntityPose
 class KinematicDrone(Node):
     def __init__(self):
         super().__init__('kinematic_drone')
-        self.speed = self.declare_parameter('speed_mps', 4.0).value
+        self.speed = float(self.declare_parameter('speed_mps', 4.0).value)
+        self.acceleration = float(self.declare_parameter('acceleration_mps2', 2.5).value)
         self.home_x = self.declare_parameter('home_x', float(os.environ.get('DRONE_HOME_X', '10.0'))).value
         self.home_y = self.declare_parameter('home_y', float(os.environ.get('DRONE_HOME_Y', '16.0'))).value
         self.landing_altitude = float(
@@ -24,7 +25,9 @@ class KinematicDrone(Node):
             'gazebo_entity_name', 'observer_drone').value
         self.pose = [self.home_x, self.home_y, self.landing_altitude]
         self.target = list(self.pose)
-        self._requested_target = None
+        self.current_speed = 0.0
+        self._pose_request_in_flight = False
+        self._last_synced_pose = None
         self.pose_client = self.create_client(SetEntityPose, self.gazebo_pose_service)
         self.last_time = self.get_clock().now()
         self.create_subscription(PoseStamped, '/drone/setpoint', self.setpoint, 10)
@@ -35,35 +38,48 @@ class KinematicDrone(Node):
         self.target = [message.pose.position.x, message.pose.position.y, message.pose.position.z]
 
     def sync_gazebo_pose(self):
-        target = tuple(self.target)
-        if target == self._requested_target or not self.pose_client.service_is_ready():
+        if self._pose_request_in_flight or not self.pose_client.service_is_ready():
+            return
+        current_pose = tuple(round(value, 3) for value in self.pose)
+        if self._last_synced_pose is not None and math.dist(current_pose, self._last_synced_pose) < 0.02:
             return
         request = SetEntityPose.Request()
         request.entity.name = self.gazebo_entity_name
         request.entity.type = Entity.MODEL
-        request.pose.position.x, request.pose.position.y, request.pose.position.z = target
+        request.pose.position.x, request.pose.position.y, request.pose.position.z = current_pose
         request.pose.orientation.w = 1.0
+        self._pose_request_in_flight = True
         future = self.pose_client.call_async(request)
-        self._requested_target = target
 
         def check_result(done):
             try:
-                if not done.result().success:
-                    self._requested_target = None
+                if done.result().success:
+                    self._last_synced_pose = current_pose
             except Exception:
-                self._requested_target = None
+                pass
+            finally:
+                self._pose_request_in_flight = False
 
         future.add_done_callback(check_result)
 
     def tick(self):
-        self.sync_gazebo_pose()
         now = self.get_clock().now()
         dt = max(0.001, (now - self.last_time).nanoseconds / 1e9)
         self.last_time = now
         distance = math.sqrt(sum((b - a) ** 2 for a, b in zip(self.pose, self.target)))
         if distance > 0.001:
-            step = min(distance, self.speed * dt)
+            stopping_speed = math.sqrt(2.0 * self.acceleration * distance)
+            desired_speed = min(self.speed, stopping_speed)
+            speed_delta = self.acceleration * dt
+            if self.current_speed < desired_speed:
+                self.current_speed = min(desired_speed, self.current_speed + speed_delta)
+            else:
+                self.current_speed = max(desired_speed, self.current_speed - speed_delta)
+            step = min(distance, self.current_speed * dt)
             self.pose = [a + (b - a) * step / distance for a, b in zip(self.pose, self.target)]
+        else:
+            self.current_speed = max(0.0, self.current_speed - self.acceleration * dt)
+        self.sync_gazebo_pose()
         message = Odometry()
         message.header.stamp = now.to_msg()
         message.header.frame_id = 'farm_map'

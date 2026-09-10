@@ -11,10 +11,12 @@ from drone_observer_msgs.action import SurveyMission
 from drone_observer_msgs.msg import TargetDetection, TargetDetectionArray, TargetTruthArray
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Odometry
+from nav_msgs.msg import Path as NavPath
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, QoSProfile
 from sensor_msgs.msg import Image
 from std_msgs.msg import String
 
@@ -50,6 +52,8 @@ class ObserverNode(Node):
         self.current_state = 'IDLE'
         self.callback_group = ReentrantCallbackGroup()
         self.setpoint_pub = self.create_publisher(PoseStamped, '/drone/setpoint', 10)
+        path_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        self.path_pub = self.create_publisher(NavPath, '/drone/mission_path', path_qos)
         self.detection_pub = self.create_publisher(TargetDetectionArray, '/drone/detections', 10)
         self.state_pub = self.create_publisher(String, '/drone/mission_state', 10)
         self.create_subscription(TargetTruthArray, '/drone/target_truth', self.on_truth, 10, callback_group=self.callback_group)
@@ -116,9 +120,11 @@ class ObserverNode(Node):
         self.artifact_dir.mkdir(parents=True, exist_ok=True)
         waypoints = scenario['waypoints']
         allowed_types = set(scenario['target_types'])
+        route = self._build_route(waypoints)
         detections = []
         self._state_history = []
         try:
+            self._publish_route(route)
             self._set_state('TAKEOFF', goal_handle, len(detections))
             self._wait_for_position(self.home_x, self.home_y, self.takeoff_altitude, goal_handle)
 
@@ -145,7 +151,7 @@ class ObserverNode(Node):
 
             self._return_and_land(goal_handle, len(detections))
             self._set_state('COMPLETE', goal_handle, len(detections))
-            report = self._write_report(mission_id, scenario_name, detections, True, 'Mission completed')
+            report = self._write_report(mission_id, scenario_name, detections, True, 'Mission completed', route)
             goal_handle.succeed()
             result = SurveyMission.Result()
             result.success, result.detections, result.report_path = True, len(detections), str(report)
@@ -154,7 +160,10 @@ class ObserverNode(Node):
         except MissionCanceled:
             self._set_state('EMERGENCY', goal_handle, len(detections))
             self._attempt_return_and_land()
-            report = self._write_report(mission_id, scenario_name, detections, False, 'Mission canceled; returned home')
+            report = self._write_report(
+                mission_id, scenario_name, detections, False,
+                'Mission canceled; returned home', route,
+            )
             goal_handle.canceled()
             result = SurveyMission.Result()
             result.success, result.detections, result.report_path = False, len(detections), str(report)
@@ -164,7 +173,7 @@ class ObserverNode(Node):
             self.get_logger().error(f'Mission failed: {error}')
             self._set_state('EMERGENCY', goal_handle, len(detections))
             self._attempt_return_and_land()
-            report = self._write_report(mission_id, scenario_name, detections, False, str(error))
+            report = self._write_report(mission_id, scenario_name, detections, False, str(error), route)
             goal_handle.abort()
             result = SurveyMission.Result()
             result.success, result.detections, result.report_path = False, len(detections), str(report)
@@ -191,6 +200,30 @@ class ObserverNode(Node):
         self._wait_for_position(self.home_x, self.home_y, self.takeoff_altitude)
         self._set_state('LAND', goal_handle, detections)
         self._wait_for_position(self.home_x, self.home_y, self.landing_altitude)
+
+    def _build_route(self, waypoints):
+        """Build the complete 3-D flight route without changing scene coordinates."""
+        route = [(self.home_x, self.home_y, self.landing_altitude)]
+        route.append((self.home_x, self.home_y, self.takeoff_altitude))
+        route.extend((float(item['x']), float(item['y']), float(item.get('z', self.takeoff_altitude)))
+                     for item in waypoints)
+        route.append((self.home_x, self.home_y, self.takeoff_altitude))
+        route.append((self.home_x, self.home_y, self.landing_altitude))
+        return route
+
+    def _publish_route(self, route):
+        message = NavPath()
+        message.header.stamp = self.get_clock().now().to_msg()
+        message.header.frame_id = 'farm_map'
+        for x, y, z in route:
+            pose = PoseStamped()
+            pose.header = message.header
+            pose.pose.position.x = x
+            pose.pose.position.y = y
+            pose.pose.position.z = z
+            pose.pose.orientation.w = 1.0
+            message.poses.append(pose)
+        self.path_pub.publish(message)
 
     def _attempt_return_and_land(self):
         try:
@@ -223,7 +256,7 @@ class ObserverNode(Node):
         message.detections = detections
         self.detection_pub.publish(message)
 
-    def _write_report(self, mission_id, scenario_name, detections, success, message):
+    def _write_report(self, mission_id, scenario_name, detections, success, message, route):
         path = self.artifact_dir / mission_id / 'report.json'
         path.parent.mkdir(parents=True, exist_ok=True)
         report = {
@@ -231,6 +264,9 @@ class ObserverNode(Node):
             'scenario': scenario_name,
             'success': success,
             'message': message,
+            'planned_route': [
+                {'x': x, 'y': y, 'z': z} for x, y, z in route
+            ],
             'state_history': self._state_history,
             'detections': [
                 {'target_id': item.target_id, 'target_type': item.target_type,

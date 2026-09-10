@@ -9,6 +9,7 @@
     <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors"/>
     <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
     <light name="sun" type="directional"><cast_shadows>true</cast_shadows><pose>0 0 30 0 0 0</pose><diffuse>0.9 0.9 0.8 1</diffuse><direction>-0.4 0.2 -1</direction></light>
+    <light name="fill_light" type="directional"><cast_shadows>false</cast_shadows><pose>0 0 20 0 0 0</pose><diffuse>0.28 0.34 0.42 1</diffuse><specular>0.08 0.1 0.14 1</specular><direction>0.55 -0.35 -1</direction></light>
     <model name="farm_ground"><static>true</static>
       <link name="link"><collision name="collision"><geometry><box><size>80 60 0.2</size></box></geometry></collision><visual name="visual"><geometry><box><size>80 60 0.2</size></box></geometry><material><ambient>0.24 0.52 0.18 1</ambient><diffuse>0.32 0.65 0.23 1</diffuse></material></visual></link>
     </model>
@@ -42,8 +43,8 @@
     <model name="cattle_shed_west"><static>true</static><pose>0 10 2 0 0 0</pose><link name="link"><visual name="body"><geometry><box><size>10 6 4</size></box></geometry><material><diffuse>0.65 0.2 0.12 1</diffuse></material></visual><visual name="roof"><pose>0 0 2.5 0 0 0</pose><geometry><box><size>11 7 0.3</size></box></geometry><material><diffuse>0.2 0.12 0.08 1</diffuse></material></visual></link></model>
     <model name="storage_silo_east"><static>true</static><pose>17 8 3 0 0 0</pose><link name="link"><visual name="tank"><geometry><cylinder><radius>2.2</radius><length>6</length></cylinder></geometry><material><diffuse>0.72 0.74 0.75 1</diffuse></material></visual><visual name="cap"><pose>0 0 3.3 0 0 0</pose><geometry><sphere><radius>2.25</radius></sphere></geometry><material><diffuse>0.6 0.62 0.65 1</diffuse></material></visual></link></model>
     <model name="produce_barn_south"><static>true</static><pose>18 -10 2 0 0 0</pose><link name="link"><visual name="body"><geometry><box><size>12 8 4</size></box></geometry><material><diffuse>0.7 0.1 0.08 1</diffuse></material></visual><visual name="roof"><pose>0 0 2.7 0 0 0</pose><geometry><box><size>13 9 0.3</size></box></geometry><material><diffuse>0.2 0.1 0.05 1</diffuse></material></visual></link></model>
-    <model name="water_tank_northwest"><static>true</static><pose>-7 -3 3 0 0 0</pose><link name="link"><visual name="tank"><geometry><cylinder><radius>2</radius><length>6</length></cylinder></geometry><material><diffuse>0.15 0.35 0.75 1</diffuse></material></visual><visual name="legs"><pose>0 0 -3.2 0 0 0</pose><geometry><box><size>3 3 0.4</size></box></geometry><material><diffuse>0.25 0.25 0.27 1</diffuse></material></visual></link></model>
-    <model name="greenhouse_southeast"><static>true</static><pose>8 -12 2 0 0 0</pose><link name="link"><visual name="body"><geometry><box><size>10 6 4</size></box></geometry><material><diffuse>0.55 0.9 0.72 1</diffuse></material><transparency>0.45</transparency></visual></link></model>
+    <model name="water_tank_northwest"><static>true</static><pose>-20 -4 3 0 0 0</pose><link name="link"><visual name="tank"><geometry><cylinder><radius>2</radius><length>6</length></cylinder></geometry><material><diffuse>0.15 0.35 0.75 1</diffuse></material></visual><visual name="legs"><pose>0 0 -3.2 0 0 0</pose><geometry><box><size>3 3 0.4</size></box></geometry><material><diffuse>0.25 0.25 0.27 1</diffuse></material></visual></link></model>
+    <model name="greenhouse_southeast"><static>true</static><pose>-22 3 2 0 0 0</pose><link name="link"><visual name="body"><geometry><box><size>10 6 4</size></box></geometry><material><diffuse>0.55 0.9 0.72 1</diffuse></material><transparency>0.45</transparency></visual></link></model>
 
     <!-- Crop plots and rows -->
     <model name="crop_field_central"><static>true</static><pose>-4 0 0.35 0 0 0</pose><link name="link"><visual name="plot"><geometry><box><size>18 13 0.5</size></box></geometry><material><diffuse>0.3 0.18 0.06 1</diffuse></material></visual></link></model>
@@ -79,6 +80,7 @@
             <horizontal_fov>1.0472</horizontal_fov>
             <image><width>320</width><height>240</height><format>R8G8B8</format></image>
             <clip><near>0.1</near><far>100</far></clip>
+            <noise><type>gaussian</type><mean>0.0</mean><stddev>0.008</stddev></noise>
             <camera_info_topic>/drone/camera/camera_info</camera_info_topic>
           </camera>
           <always_on>true</always_on>
