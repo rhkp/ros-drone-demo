@@ -7,6 +7,8 @@ from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from ros_gz_interfaces.msg import Entity
 from ros_gz_interfaces.srv import SetEntityPose
+from tf2_ros import TransformBroadcaster
+from geometry_msgs.msg import TransformStamped
 
 
 class KinematicDrone(Node):
@@ -32,6 +34,8 @@ class KinematicDrone(Node):
         self.last_time = self.get_clock().now()
         self.create_subscription(PoseStamped, '/drone/setpoint', self.setpoint, 10)
         self.odom_pub = self.create_publisher(Odometry, '/drone/odom', 10)
+        self.nav_odom_pub = self.create_publisher(Odometry, '/drone/nav_odom', 10)
+        self.tf_broadcaster = TransformBroadcaster(self)
         self.create_timer(0.05, self.tick)
 
     def setpoint(self, message):
@@ -66,6 +70,7 @@ class KinematicDrone(Node):
         now = self.get_clock().now()
         dt = max(0.001, (now - self.last_time).nanoseconds / 1e9)
         self.last_time = now
+        previous_pose = tuple(self.pose)
         distance = math.sqrt(sum((b - a) ** 2 for a, b in zip(self.pose, self.target)))
         if distance > 0.001:
             stopping_speed = math.sqrt(2.0 * self.acceleration * distance)
@@ -87,6 +92,26 @@ class KinematicDrone(Node):
         message.pose.pose.position.x, message.pose.pose.position.y, message.pose.pose.position.z = self.pose
         message.pose.pose.orientation.w = 1.0
         self.odom_pub.publish(message)
+
+        nav_odom = Odometry()
+        nav_odom.header.stamp = now.to_msg()
+        nav_odom.header.frame_id = 'odom'
+        nav_odom.child_frame_id = 'base_link'
+        nav_odom.pose.pose.position.x = self.pose[0]
+        nav_odom.pose.pose.position.y = self.pose[1]
+        nav_odom.pose.pose.orientation.w = 1.0
+        nav_odom.twist.twist.linear.x = (self.pose[0] - previous_pose[0]) / dt
+        nav_odom.twist.twist.linear.y = (self.pose[1] - previous_pose[1]) / dt
+        self.nav_odom_pub.publish(nav_odom)
+
+        transform = TransformStamped()
+        transform.header.stamp = now.to_msg()
+        transform.header.frame_id = 'odom'
+        transform.child_frame_id = 'base_link'
+        transform.transform.translation.x = self.pose[0]
+        transform.transform.translation.y = self.pose[1]
+        transform.transform.rotation.w = 1.0
+        self.tf_broadcaster.sendTransform(transform)
 
 
 def main(args=None):

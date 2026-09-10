@@ -5,7 +5,7 @@ FROM ${REGISTRY}/hbr-ros-base:${BASE_TAG} AS build
 
 USER 0
 ARG ROS_DISTRO=jazzy
-RUN micromamba install -y -n ros_env -c robostack-${ROS_DISTRO} -c conda-forge pyyaml ros-${ROS_DISTRO}-ros-gz-interfaces && \
+RUN micromamba install -y -n ros_env -c robostack-${ROS_DISTRO} -c conda-forge pyyaml ros-${ROS_DISTRO}-ros-gz-interfaces ros-${ROS_DISTRO}-navigation2 ros-${ROS_DISTRO}-nav2-bringup && \
     micromamba clean -a -y
 COPY ros_ws/src /opt/drone_ws/src
 RUN bash -c "source ${ROS_ENV_SETUP} && colcon build --base-paths /opt/drone_ws/src --merge-install --install-base /opt/drone_ws/install"
@@ -17,6 +17,7 @@ RUN mkdir -p /opt/drone_ws /opt/drone-demo/config /opt/drone-demo/scripts /opt/d
 COPY --from=build /opt/drone_ws/install /opt/drone_ws/install
 COPY --from=build /opt/micromamba /opt/micromamba
 COPY config/scenarios.yaml /opt/drone-demo/config/scenarios.yaml
+COPY config/nav2_params.yaml /opt/drone-demo/config/nav2_params.yaml
 COPY scripts/launch-observer.sh /opt/drone-demo/scripts/launch-observer.sh
 COPY images/drone-observer/ros-env.sh /opt/drone/scripts/ros-env.sh
 RUN chmod 0755 /opt/drone-demo/scripts/launch-observer.sh /opt/drone/scripts/ros-env.sh && \

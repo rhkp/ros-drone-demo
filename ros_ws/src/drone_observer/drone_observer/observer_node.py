@@ -21,7 +21,8 @@ from sensor_msgs.msg import Image
 from std_msgs.msg import Float32, String
 
 from .image_utils import image_to_rgb, write_rgb_png
-from .navigation import FlightNavigator, Geofence, NavigationCanceled, ObstacleZone
+from .navigation import Geofence, NavigationCanceled, ObstacleZone
+from .nav2_navigation import Nav2Navigator
 
 
 class MissionCanceled(Exception):
@@ -50,7 +51,8 @@ class ObserverNode(Node):
         self._dynamic_obstacle_received_at = None
         self._dynamic_obstacle_count = 0
         self.navigation_progress_pub = self.create_publisher(Float32, '/drone/navigation_progress', 10)
-        self.navigator = FlightNavigator(
+        self.navigator = Nav2Navigator(
+            self,
             self.publish_setpoint,
             lambda: self._last_pose,
             self._publish_navigation_progress,

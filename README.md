@@ -55,14 +55,19 @@ Each accepted mission publishes its complete planned 3-D route on
 waypoints, return, and landing. The same route is recorded in the mission's
 `report.json` under `planned_route` for downstream navigation and audit tools.
 The navigation layer validates every route against the configured geofence and
-publishes normalized execution progress on `/drone/navigation_progress`. It can
-also route around configurable axis-aligned `no_fly_zones` without changing
-the farm world or its target coordinates.
+publishes normalized execution progress on `/drone/navigation_progress`. Planar
+motion is executed by Nav2's planner/controller stack through the
+`NavigateToPose` action, while the existing kinematic adapter preserves smooth
+3-D altitude changes. The farm map publisher supplies a transient-local
+`/map` costmap, and the configured axis-aligned `no_fly_zones` are represented
+as occupied map cells without changing the farm world or its target
+coordinates.
 Runtime obstacle centers may be supplied as a `geometry_msgs/PoseArray` on
 `/drone/dynamic_obstacles`. Each pose is expanded using the configured
 `dynamic_obstacles` dimensions, stale feeds expire automatically, and an active
-mission safely replans around newly blocked segments. Replan events are recorded
-in the mission report for verification.
+mission is converted into Nav2 obstacle-layer scan data so Nav2 can replan
+around newly blocked segments. Replan events are recorded in the mission report
+for verification.
 
 The drone starts and lands at the dedicated `DRONE STATION` deck at
 `farm_map` coordinates `(10, 16)`. The observer and kinematic flight node use
