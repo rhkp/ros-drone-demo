@@ -1,4 +1,7 @@
 # Farm assets are intentionally explicit so this file is easy to customize.
+navigation:
+  geofence: {min_x: -35, max_x: 35, min_y: -25, max_y: 25, min_z: 0, max_z: 20}
+
 scenarios:
   inventory:
     target_types: [well, storage_silo, cattle_shed, produce_barn]

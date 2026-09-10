@@ -54,6 +54,8 @@ Each accepted mission publishes its complete planned 3-D route on
 `/drone/mission_path` as a `nav_msgs/Path`, including takeoff, survey
 waypoints, return, and landing. The same route is recorded in the mission's
 `report.json` under `planned_route` for downstream navigation and audit tools.
+The navigation layer validates every route against the configured geofence and
+publishes normalized execution progress on `/drone/navigation_progress`.
 
 The drone starts and lands at the dedicated `DRONE STATION` deck at
 `farm_map` coordinates `(10, 16)`. The observer and kinematic flight node use
