@@ -21,7 +21,7 @@ from sensor_msgs.msg import Image
 from std_msgs.msg import Float32, String
 
 from .image_utils import image_to_rgb, write_rgb_png
-from .navigation import FlightNavigator, Geofence, NavigationCanceled
+from .navigation import FlightNavigator, Geofence, NavigationCanceled, ObstacleZone
 
 
 class MissionCanceled(Exception):
@@ -36,13 +36,16 @@ class ObserverNode(Node):
         self.artifact_dir = Path(self.declare_parameter('artifact_dir', os.environ.get('DRONE_ARTIFACT_DIR', '/tmp/drone-artifacts')).value)
         with open(scenario_file, encoding='utf-8') as stream:
             self.config = yaml.safe_load(stream)
-        geofence_config = self.config.get('navigation', {}).get('geofence', {})
+        navigation_config = self.config.get('navigation', {})
+        geofence_config = navigation_config.get('geofence', {})
+        obstacles = [ObstacleZone.from_mapping(item) for item in navigation_config.get('no_fly_zones', [])]
         self.navigation_progress_pub = self.create_publisher(Float32, '/drone/navigation_progress', 10)
         self.navigator = FlightNavigator(
             self.publish_setpoint,
             lambda: self._last_pose,
             self._publish_navigation_progress,
             Geofence.from_mapping(geofence_config),
+            obstacles,
         )
         self.home_x = self.declare_parameter('home_x', float(os.environ.get('DRONE_HOME_X', '0.0'))).value
         self.home_y = self.declare_parameter('home_y', float(os.environ.get('DRONE_HOME_Y', '0.0'))).value
@@ -130,11 +133,13 @@ class ObserverNode(Node):
         waypoints = scenario['waypoints']
         allowed_types = set(scenario['target_types'])
         route = []
+        planned_route = []
         detections = []
         self._state_history = []
         try:
             route = self._build_route(waypoints)
-            self._publish_route(route)
+            planned_route = self.navigator.plan_route(route)
+            self._publish_route(planned_route)
             self._set_state('TAKEOFF', goal_handle, len(detections))
             segment_count = len(route) - 1
             self._wait_for_position(
@@ -169,7 +174,7 @@ class ObserverNode(Node):
 
             self._return_and_land(goal_handle, len(detections), route)
             self._set_state('COMPLETE', goal_handle, len(detections))
-            report = self._write_report(mission_id, scenario_name, detections, True, 'Mission completed', route)
+            report = self._write_report(mission_id, scenario_name, detections, True, 'Mission completed', planned_route)
             goal_handle.succeed()
             result = SurveyMission.Result()
             result.success, result.detections, result.report_path = True, len(detections), str(report)
@@ -180,7 +185,7 @@ class ObserverNode(Node):
             self._attempt_return_and_land()
             report = self._write_report(
                 mission_id, scenario_name, detections, False,
-                'Mission canceled; returned home', route,
+                'Mission canceled; returned home', planned_route,
             )
             goal_handle.canceled()
             result = SurveyMission.Result()
@@ -191,7 +196,7 @@ class ObserverNode(Node):
             self.get_logger().error(f'Mission failed: {error}')
             self._set_state('EMERGENCY', goal_handle, len(detections))
             self._attempt_return_and_land()
-            report = self._write_report(mission_id, scenario_name, detections, False, str(error), route)
+            report = self._write_report(mission_id, scenario_name, detections, False, str(error), planned_route)
             goal_handle.abort()
             result = SurveyMission.Result()
             result.success, result.detections, result.report_path = False, len(detections), str(report)

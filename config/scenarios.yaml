@@ -1,6 +1,8 @@
 # Farm assets are intentionally explicit so this file is easy to customize.
 navigation:
   geofence: {min_x: -35, max_x: 35, min_y: -25, max_y: 25, min_z: 0, max_z: 20}
+  no_fly_zones:
+    - {id: north_access_restriction, min_x: -2, max_x: 4, min_y: 11, max_y: 15, min_z: 8, max_z: 20, margin: 2}
 
 scenarios:
   inventory:

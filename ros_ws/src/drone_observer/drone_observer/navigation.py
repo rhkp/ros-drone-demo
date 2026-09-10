@@ -43,15 +43,131 @@ class Geofence:
             self.validate_pose(pose)
 
 
+@dataclass(frozen=True)
+class ObstacleZone:
+    zone_id: str
+    min_x: float
+    max_x: float
+    min_y: float
+    max_y: float
+    min_z: float
+    max_z: float
+    margin: float = 1.0
+
+    @classmethod
+    def from_mapping(cls, mapping):
+        values = mapping or {}
+        zone = cls(
+            str(values.get('id', 'unnamed-zone')),
+            float(values['min_x']),
+            float(values['max_x']),
+            float(values['min_y']),
+            float(values['max_y']),
+            float(values.get('min_z', 0.0)),
+            float(values.get('max_z', 25.0)),
+            float(values.get('margin', 1.0)),
+        )
+        if (zone.min_x >= zone.max_x or zone.min_y >= zone.max_y or
+                zone.min_z >= zone.max_z or zone.margin < 0.0):
+            raise ValueError(f'Invalid obstacle zone: {zone.zone_id}')
+        return zone
+
+    def _z_intersects(self, start, end):
+        return max(min(start[2], end[2]), self.min_z) <= min(max(start[2], end[2]), self.max_z)
+
+    def _contains_xy(self, pose):
+        return self.min_x < pose[0] < self.max_x and self.min_y < pose[1] < self.max_y
+
+    @staticmethod
+    def _crosses_open_rectangle(start, end, min_x, max_x, min_y, max_y):
+        epsilon = 1e-7
+        min_x += epsilon
+        max_x -= epsilon
+        min_y += epsilon
+        max_y -= epsilon
+        dx, dy = end[0] - start[0], end[1] - start[1]
+        lower, upper = 0.0, 1.0
+        for origin, delta, lower_bound, upper_bound in (
+                (start[0], dx, min_x, max_x), (start[1], dy, min_y, max_y)):
+            if abs(delta) < epsilon:
+                if lower_bound < origin < upper_bound:
+                    continue
+                return False
+            first = (lower_bound - origin) / delta
+            second = (upper_bound - origin) / delta
+            lower = max(lower, min(first, second))
+            upper = min(upper, max(first, second))
+            if lower >= upper:
+                return False
+        return True
+
+    def intersects(self, start, end):
+        if not self._z_intersects(start, end):
+            return False
+        return self._crosses_open_rectangle(
+            start, end,
+            self.min_x, self.max_x, self.min_y, self.max_y,
+        )
+
+    def detour_for_segment(self, start, end):
+        if not self.intersects(start, end):
+            return None
+        if self._contains_xy(start) or self._contains_xy(end):
+            raise ValueError(f'Route enters obstacle zone: {self.zone_id}')
+
+        min_x, max_x = self.min_x - self.margin, self.max_x + self.margin
+        min_y, max_y = self.min_y - self.margin, self.max_y + self.margin
+        z = max(start[2], end[2])
+        corners = [
+            (min_x, min_y, z), (min_x, max_y, z),
+            (max_x, min_y, z), (max_x, max_y, z),
+        ]
+        nodes = [tuple(start), tuple(end)] + corners
+        edges = {index: [] for index in range(len(nodes))}
+        for left in range(len(nodes)):
+            for right in range(left + 1, len(nodes)):
+                if self._crosses_open_rectangle(nodes[left], nodes[right], min_x, max_x, min_y, max_y):
+                    continue
+                distance = math.dist(nodes[left], nodes[right])
+                edges[left].append((right, distance))
+                edges[right].append((left, distance))
+
+        distances = [math.inf] * len(nodes)
+        previous = [None] * len(nodes)
+        distances[0] = 0.0
+        unvisited = set(range(len(nodes)))
+        while unvisited:
+            current = min(unvisited, key=lambda index: distances[index])
+            unvisited.remove(current)
+            if current == 1 or distances[current] == math.inf:
+                break
+            for neighbor, distance in edges[current]:
+                candidate = distances[current] + distance
+                if candidate < distances[neighbor]:
+                    distances[neighbor] = candidate
+                    previous[neighbor] = current
+        if distances[1] == math.inf:
+            raise ValueError(f'Unable to route around obstacle zone: {self.zone_id}')
+
+        path = []
+        current = 1
+        while current is not None:
+            path.append(nodes[current])
+            current = previous[current]
+        return list(reversed(path))
+
+
 class FlightNavigator:
     """Small planner/controller boundary that can later be backed by Nav2."""
 
     def __init__(self, publish_setpoint, get_pose, on_progress=None, geofence=None,
+                 obstacles=None,
                  tolerance=0.5, update_period=0.1, timeout=30.0):
         self.publish_setpoint = publish_setpoint
         self.get_pose = get_pose
         self.on_progress = on_progress or (lambda _value: None)
         self.geofence = geofence or Geofence.from_mapping({})
+        self.obstacles = tuple(obstacles or ())
         self.tolerance = tolerance
         self.update_period = update_period
         self.timeout = timeout
@@ -59,14 +175,47 @@ class FlightNavigator:
     def validate_route(self, route):
         self.geofence.validate_route(route)
 
+    def plan_segment(self, start, target):
+        path = [tuple(start), tuple(target)]
+        for obstacle in self.obstacles:
+            planned = []
+            for left, right in zip(path, path[1:]):
+                detour = obstacle.detour_for_segment(left, right)
+                if detour:
+                    planned.extend(detour[:-1])
+                else:
+                    planned.append(left)
+            planned.append(path[-1])
+            path = planned
+        return path
+
+    def plan_route(self, route):
+        self.validate_route(route)
+        planned = [tuple(route[0])]
+        for left, right in zip(route, route[1:]):
+            segment = self.plan_segment(left, right)
+            planned.extend(segment[1:])
+        return planned
+
     def goto(self, target, cancel_requested=None, progress_start=0.0, progress_end=1.0):
         target = tuple(float(value) for value in target)
         self.geofence.validate_pose(target)
         cancel_requested = cancel_requested or (lambda: False)
+        start = self.get_pose() or target
+        path = self.plan_segment(start, target)
+        lengths = [math.dist(left, right) for left, right in zip(path, path[1:])]
+        total_length = sum(lengths) or 1.0
+        traveled = 0.0
+        for index, waypoint in enumerate(path[1:]):
+            segment_start = progress_start + (progress_end - progress_start) * traveled / total_length
+            traveled += lengths[index]
+            segment_end = progress_start + (progress_end - progress_start) * traveled / total_length
+            self._move_to(waypoint, cancel_requested, segment_start, segment_end)
+
+    def _move_to(self, target, cancel_requested, progress_start, progress_end):
         initial_pose = self.get_pose()
         initial_distance = math.dist(initial_pose, target) if initial_pose else 0.0
         deadline = time.monotonic() + self.timeout
-
         while time.monotonic() < deadline:
             if cancel_requested():
                 raise NavigationCanceled()
