@@ -30,6 +30,7 @@ class KinematicDrone(Node):
         self.current_speed = 0.0
         self._pose_request_in_flight = False
         self._last_synced_pose = None
+        self._last_pose_warning = self.get_clock().now()
         self.pose_client = self.create_client(SetEntityPose, self.gazebo_pose_service)
         self.last_time = self.get_clock().now()
         self.create_subscription(PoseStamped, '/drone/setpoint', self.setpoint, 10)
@@ -42,7 +43,15 @@ class KinematicDrone(Node):
         self.target = [message.pose.position.x, message.pose.position.y, message.pose.position.z]
 
     def sync_gazebo_pose(self):
-        if self._pose_request_in_flight or not self.pose_client.service_is_ready():
+        if self._pose_request_in_flight:
+            return
+        if not self.pose_client.service_is_ready():
+            now = self.get_clock().now()
+            if (now - self._last_pose_warning).nanoseconds >= 5e9:
+                self.get_logger().warning(
+                    f'Gazebo pose service is not ready: {self.gazebo_pose_service}'
+                )
+                self._last_pose_warning = now
             return
         current_pose = tuple(round(value, 3) for value in self.pose)
         if self._last_synced_pose is not None and math.dist(current_pose, self._last_synced_pose) < 0.02:
@@ -57,10 +66,15 @@ class KinematicDrone(Node):
 
         def check_result(done):
             try:
-                if done.result().success:
+                response = done.result()
+                if response.success:
                     self._last_synced_pose = current_pose
-            except Exception:
-                pass
+                else:
+                    self.get_logger().warning(
+                        f'Gazebo rejected pose update for {self.gazebo_entity_name}'
+                    )
+            except Exception as error:
+                self.get_logger().warning(f'Gazebo pose update failed: {error}')
             finally:
                 self._pose_request_in_flight = False
 

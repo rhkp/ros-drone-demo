@@ -8,6 +8,29 @@
     <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
     <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors"/>
     <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <gui fullscreen="0">
+      <plugin filename="MinimalScene" name="3D View">
+        <gz-gui>
+          <title>3D View</title>
+          <property type="bool" key="showTitleBar">false</property>
+          <property type="string" key="state">docked</property>
+        </gz-gui>
+        <engine>ogre2</engine>
+        <scene>scene</scene>
+        <!-- Start with the complete farm, route overlay, and restricted volume in view. -->
+        <camera_pose>-45 -45 55 0 0.65 0.785398</camera_pose>
+        <ambient_light>0.55 0.55 0.55</ambient_light>
+        <background_color>0.55 0.75 0.95</background_color>
+      </plugin>
+      <plugin filename="GzSceneManager" name="Scene Manager"/>
+      <plugin filename="InteractiveViewControl" name="Interactive view control"/>
+      <plugin filename="WorldControl" name="World control"/>
+      <plugin filename="WorldStats" name="World stats"/>
+      <plugin filename="EntityContextMenuPlugin" name="Entity context menu"/>
+      <plugin filename="MarkerManager" name="MarkerManager">
+        <topic_name>/marker</topic_name>
+      </plugin>
+    </gui>
     <light name="sun" type="directional"><cast_shadows>true</cast_shadows><pose>0 0 30 0 0 0</pose><diffuse>0.9 0.9 0.8 1</diffuse><direction>-0.4 0.2 -1</direction></light>
     <light name="fill_light" type="directional"><cast_shadows>false</cast_shadows><pose>0 0 20 0 0 0</pose><diffuse>0.28 0.34 0.42 1</diffuse><specular>0.08 0.1 0.14 1</specular><direction>0.55 -0.35 -1</direction></light>
     <model name="farm_ground"><static>true</static>
@@ -23,9 +46,22 @@
         <visual name="landing_zone_inner"><pose>0 0 0.48 0 0 0</pose><geometry><cylinder><radius>2.75</radius><length>0.03</length></cylinder></geometry><material><ambient>0.08 0.14 0.22 1</ambient><diffuse>0.12 0.22 0.34 1</diffuse></material></visual>
         <visual name="landing_cross_x"><pose>0 0 0.51 0 0 0</pose><geometry><box><size>4.5 0.35 0.04</size></box></geometry><material><diffuse>0.95 0.95 0.9 1</diffuse></material></visual>
         <visual name="landing_cross_y"><pose>0 0 0.51 0 0 0</pose><geometry><box><size>0.35 4.5 0.04</size></box></geometry><material><diffuse>0.95 0.95 0.9 1</diffuse></material></visual>
-        <visual name="deck_label"><pose>0 0 0.54 0 0 0</pose><geometry><text><text>DRONE</text><font><size>1.0</size></font></text></geometry><material><diffuse>0.95 0.95 0.9 1</diffuse></material></visual>
         <visual name="station_sign"><pose>0 3.55 2.35 0 0 0</pose><geometry><box><size>6.5 0.2 1.5</size></box></geometry><material><diffuse>0.08 0.12 0.18 1</diffuse></material></visual>
-        <visual name="station_sign_text"><pose>0 3.42 2.35 1.5708 0 0</pose><geometry><text><text>DRONE STATION</text><font><size>0.72</size></font></text></geometry><material><diffuse>0.95 0.75 0.12 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <!-- Logical Nav2 no-fly zone marker: visual only, with no collision. -->
+    <model name="north_access_restriction_visual"><static>true</static><pose>1 13 14 0 0 0</pose>
+      <link name="link">
+        <visual name="restricted_volume">
+          <geometry><box><size>10 8 12</size></box></geometry>
+          <material>
+            <ambient>0.65 0.02 0.02 1</ambient>
+            <diffuse>0.95 0.04 0.04 1</diffuse>
+            <emissive>0.18 0 0 1</emissive>
+          </material>
+          <transparency>0.82</transparency>
+        </visual>
       </link>
     </model>
 

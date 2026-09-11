@@ -43,7 +43,7 @@ source install/setup.bash
 
 Evidence and `report.json` are written below `artifacts/` by default.
 
-The farm world contains the moving `observer_drone` model and a downward-facing Gazebo camera sensor. The world image bridges rendered camera frames to `/drone/camera/image_raw` and exposes `/world/farm_survey/set_pose`; the observer uses that service to keep the visible drone model synchronized with each waypoint. Evidence capture fails if no rendered frame is available.
+The farm world contains the moving `observer_drone` model and a downward-facing Gazebo camera sensor. The world image bridges rendered camera frames to `/drone/camera/image_raw` and exposes `/world/farm_survey/set_pose`; the observer uses that service to keep the visible drone model synchronized with each waypoint. Evidence capture fails if no rendered frame is available. The logical `north_access_restriction` is also shown as a translucent, visual-only volume in Gazebo, while the latest `/drone/mission_path` is rendered as a thick yellow flight ribbon with waypoint markers. The GUI opens in an elevated farm overview so the route and detour are visible. Neither visual adds collision geometry.
 
 The survey action runs an explicit mission state machine: `TAKEOFF`, `TRANSIT`,
 `INSPECT`, `RETURN`, `LAND`, and `COMPLETE`. Cancellation or a movement/camera
