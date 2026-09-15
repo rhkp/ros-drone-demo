@@ -1,0 +1,13 @@
+{{- $curator := .Values.curator | default dict }}
+{{- if (default false $curator.enabled) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "farm-drone-ml-data.fullname" . }}-curator
+  labels:
+    {{- include "farm-drone-ml-data.labels" . | nindent 4 }}
+    app.kubernetes.io/component: dataset-curator
+data:
+  assemble_dataset.py: |-
+{{ .Files.Get "curator/assemble_dataset.py" | indent 4 }}
+{{- end }}

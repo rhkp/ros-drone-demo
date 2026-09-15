@@ -1,0 +1,76 @@
+{{- $detector := .Values.detector | default dict }}
+{{- if (default false $detector.enabled) }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "farm-drone-ml-data.fullname" . }}-detector
+  labels:
+    {{- include "farm-drone-ml-data.labels" . | nindent 4 }}
+    app.kubernetes.io/component: camera-detector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "farm-drone-ml-data.name" . }}-detector
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "farm-drone-ml-data.name" . }}-detector
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: camera-detector
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/name
+                    operator: In
+                    values:
+                      - {{ include "farm-drone-ml-data.name" . }}-viewer
+                      - {{ include "farm-drone-ml-data.name" . }}-storage-anchor
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: detector
+          image: {{ default "quay.io/rhkp/hbr-drone-observer:v0.7.0" $detector.image | quote }}
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/bash", "-lc"]
+          args:
+            - >-
+              source /opt/drone/scripts/ros-env.sh &&
+              source /opt/drone_ws/install/setup.bash &&
+              exec ros2 run drone_observer vision_detector
+          env:
+            - name: RMW_IMPLEMENTATION
+              value: rmw_zenoh_cpp
+            - name: ZENOH_ROUTER_ENDPOINT
+              value: {{ default "tcp/farm-drone-ros-drone-demo-zenoh.arhkp1-farm-drone.svc.cluster.local:7447" $detector.zenohEndpoint | quote }}
+            - name: DRONE_MODEL_PATH
+              value: {{ default "/data/perception/models/v6/detector.onnx" $detector.modelPath | quote }}
+            - name: DRONE_MODEL_VERSION
+              value: {{ default "v6" $detector.modelVersion | quote }}
+            - name: DRONE_CLASS_NAMES
+              value: {{ default "well,storage_silo,cattle_shed,produce_barn,crop_field,greenhouse,water_tank" $detector.classNames | quote }}
+            - name: DRONE_CONFIDENCE_THRESHOLD
+              value: {{ default "0.35" $detector.confidenceThreshold | quote }}
+            - name: DRONE_DETECTION_TOPIC
+              value: {{ default "/drone/camera_detections" $detector.outputTopic | quote }}
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          volumeMounts:
+            - name: perception-data
+              mountPath: {{ default "/data/perception" .Values.dataPath | quote }}
+              readOnly: true
+      volumes:
+        - name: perception-data
+          persistentVolumeClaim:
+            claimName: {{ include "farm-drone-ml-data.fullname" . }}
+{{- end }}

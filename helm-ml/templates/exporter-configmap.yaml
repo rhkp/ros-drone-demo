@@ -1,0 +1,13 @@
+{{- $exporter := .Values.exporter | default dict }}
+{{- if (default false $exporter.enabled) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "farm-drone-ml-data.fullname" . }}-exporter
+  labels:
+    {{- include "farm-drone-ml-data.labels" . | nindent 4 }}
+    app.kubernetes.io/component: model-exporter
+data:
+  export_onnx.py: |-
+{{ .Files.Get "exporter/export_onnx.py" | indent 4 }}
+{{- end }}

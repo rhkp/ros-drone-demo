@@ -1,0 +1,82 @@
+{{- $recorder := .Values.recorder | default dict }}
+{{- if (default false $recorder.enabled) }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "farm-drone-ml-data.fullname" . }}-recorder
+  labels:
+    {{- include "farm-drone-ml-data.labels" . | nindent 4 }}
+    app.kubernetes.io/component: dataset-recorder
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+    rollingUpdate: null
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "farm-drone-ml-data.name" . }}-recorder
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "farm-drone-ml-data.name" . }}-recorder
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: dataset-recorder
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      # The ML PVC is RWO. Keep the recorder with the viewer/anchor so all
+      # consumers share the same node instead of triggering Multi-Attach.
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/name
+                    operator: In
+                    values:
+                      - {{ include "farm-drone-ml-data.name" . }}-viewer
+                      - {{ include "farm-drone-ml-data.name" . }}-storage-anchor
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: recorder
+          image: {{ default "quay.io/rhkp/hbr-drone-observer:v0.6.9" $recorder.image | quote }}
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/bash", "-lc"]
+          args:
+            - >-
+              source /opt/drone/scripts/ros-env.sh &&
+              source /opt/drone_ws/install/setup.bash &&
+              exec ros2 run drone_observer dataset_recorder
+          env:
+            - name: RMW_IMPLEMENTATION
+              value: rmw_zenoh_cpp
+            - name: ZENOH_ROUTER_ENDPOINT
+              value: {{ default "tcp/farm-drone-ros-drone-demo-zenoh.arhkp1-farm-drone.svc.cluster.local:7447" $recorder.zenohEndpoint | quote }}
+            - name: DRONE_SCENARIO
+              value: {{ default "all" $recorder.scenario | quote }}
+            - name: DRONE_DATASET_SEED
+              value: {{ default "default" $recorder.seed | quote }}
+            - name: DRONE_DATASET_DIR
+              value: {{ default "/data/perception/datasets/flight-v6" $recorder.outputDir | quote }}
+            - name: DRONE_CAPTURE_INTERVAL_SEC
+              value: {{ default "0.5" $recorder.captureIntervalSec | quote }}
+            - name: DRONE_MAX_FRAMES
+              value: {{ default "0" $recorder.maxFrames | quote }}
+            - name: DRONE_SCENARIO_FILE
+              value: {{ default "/opt/drone-demo/config/scenarios.yaml" $recorder.scenarioFile | quote }}
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: perception-data
+              mountPath: {{ default "/data/perception" .Values.dataPath | quote }}
+      volumes:
+        - name: perception-data
+          persistentVolumeClaim:
+            claimName: {{ include "farm-drone-ml-data.fullname" . }}
+{{- end }}

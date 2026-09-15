@@ -1,0 +1,97 @@
+storage:
+  size: 10Gi
+  className: gp3-csi
+
+dataPath: /data/perception
+
+anchor:
+  enabled: true
+  image: registry.access.redhat.com/ubi9/ubi-minimal:9.5
+
+# Human-friendly, read-only showcase for datasets, models, and evaluation reports.
+viewer:
+  enabled: true
+  image: registry.access.redhat.com/ubi9/python-311:latest
+  port: 8080
+  route:
+    enabled: true
+    host: ""
+
+# Optional shadow-mode camera detector. It never subscribes to simulator truth
+# and publishes to a separate topic until the model passes promotion gates.
+detector:
+  enabled: false
+  image: quay.io/rhkp/hbr-drone-observer:v0.8.1
+  modelPath: /data/perception/models/v6/detector.onnx
+  modelVersion: v6
+  classNames: well,storage_silo,cattle_shed,produce_barn,crop_field,greenhouse,water_tank
+  confidenceThreshold: "0.35"
+  outputTopic: /drone/camera_detections
+
+# One-shot offline scorer. It may read simulator truth only to score the
+# camera-only predictions; it never feeds truth into the detector.
+shadowEvaluator:
+  enabled: false
+  image: quay.io/rhkp/hbr-drone-observer:v0.8.1
+  durationSec: "240"
+  iouThreshold: "0.5"
+  modelVersion: v6
+  outputPath: /data/perception/evaluations/shadow-v6/report.json
+
+# Enable only after publishing an observer image containing dataset_recorder.
+recorder:
+  enabled: false
+  image: quay.io/rhkp/hbr-drone-observer:v0.6.9
+  scenario: all
+  seed: default
+  outputDir: /data/perception/datasets/flight-v6
+  captureIntervalSec: 0.5
+  maxFrames: 0
+  scenarioFile: /opt/drone-demo/config/scenarios.yaml
+  zenohEndpoint: tcp/farm-drone-ros-drone-demo-zenoh.arhkp1-farm-drone.svc.cluster.local:7447
+
+# One-shot raw-flight curation. It writes a new dataset and never deletes raw data.
+curator:
+  enabled: false
+  image: registry.access.redhat.com/ubi9/python-311:latest
+  sources: [flight-v3, flight-v4, flight-crops-v1, flight-water-v1, flight-v5, flight-v6]
+  outputDir: /data/perception/datasets/curated-v6
+  negativeRatio: 0.35
+  splitMap:
+    flight-v3: train
+    flight-v4: train
+    flight-crops-v1: train
+    flight-water-v1: train
+    flight-v5: validation
+    flight-v6: train
+
+# One-shot GPU baseline. The PVC must be unmounted by viewer/anchor first.
+trainer:
+  enabled: false
+  image: pytorch/pytorch:2.4.1-cuda12.1-cudnn9-runtime
+  datasetDir: /data/perception/datasets/curated-v6
+  modelDir: /data/perception/models/v6
+  evalDir: /data/perception/evaluations/v6
+  epochs: 12
+  batchSize: 4
+  seed: "20260914"
+  nodeSelector:
+    nvidia.com/gpu.present: "true"
+  tolerations:
+    - key: g5-gpu
+      operator: Exists
+      effect: NoSchedule
+
+# One-shot PyTorch -> ONNX conversion. Disable viewer/anchor while it runs.
+exporter:
+  enabled: false
+  image: pytorch/pytorch:2.4.1-cuda12.1-cudnn9-runtime
+  modelDir: /data/perception/models/v6
+  checkpoint: /data/perception/models/v6/detector.pt
+  output: /data/perception/models/v6/detector.onnx
+  nodeSelector:
+    nvidia.com/gpu.present: "true"
+  tolerations:
+    - key: g5-gpu
+      operator: Exists
+      effect: NoSchedule

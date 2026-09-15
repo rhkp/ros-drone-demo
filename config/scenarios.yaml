@@ -45,10 +45,26 @@ scenarios:
       - {x: 18, y: -10, z: 12}
 
 targets:
-  - {id: well_north, type: well, x: -18, y: 10, z: 1}
-  - {id: storage_silo_east, type: storage_silo, x: 17, y: 8, z: 3}
-  - {id: cattle_shed_west, type: cattle_shed, x: 0, y: 10, z: 2}
-  - {id: produce_barn_south, type: produce_barn, x: 18, y: -10, z: 2}
-  - {id: crop_field_central, type: crop_field, x: -4, y: 0, z: 0}
-  - {id: greenhouse_southeast, type: greenhouse, x: -22, y: 3, z: 2}
-  - {id: water_tank_northwest, type: water_tank, x: -20, y: -4, z: 3}
+  # Dimensions are the approximate visible extents in farm_map metres. They are
+  # used only by offline dataset generation to project 3-D truth into 2-D boxes.
+  - {id: well_north, type: well, x: -18, y: 10, z: 1, dimensions: {x: 3.0, y: 2.0, z: 2.2}}
+  - {id: storage_silo_east, type: storage_silo, x: 17, y: 8, z: 3, dimensions: {x: 4.5, y: 4.5, z: 6.6}}
+  - {id: cattle_shed_west, type: cattle_shed, x: 0, y: 10, z: 2, dimensions: {x: 11.0, y: 7.0, z: 5.3}}
+  - {id: produce_barn_south, type: produce_barn, x: 18, y: -10, z: 2, dimensions: {x: 13.0, y: 9.0, z: 5.5}}
+  - {id: crop_field_central, type: crop_field, x: -4, y: 0, z: 0, dimensions: {x: 18.0, y: 13.0, z: 1.5}}
+  - {id: greenhouse_southeast, type: greenhouse, x: -22, y: 3, z: 2, dimensions: {x: 10.0, y: 6.0, z: 4.0}}
+  - {id: water_tank_northwest, type: water_tank, x: -20, y: -4, z: 3, dimensions: {x: 4.0, y: 4.0, z: 6.4}}
+
+# Stable class IDs and the camera mount model used by the offline recorder.
+# The simulated camera is nadir-facing with a +90-degree pitch in SDF. Its
+# optical image axes therefore use the signed, swapped farm_map axes below.
+# This is deliberately explicit and versioned.
+dataset:
+  class_order: [well, storage_silo, cattle_shed, produce_barn, crop_field, greenhouse, water_tank]
+  camera:
+    mount: downward
+    offset_z: 0.36
+    image_x_axis: y
+    image_x_sign: -1
+    image_y_axis: x
+    image_y_sign: -1

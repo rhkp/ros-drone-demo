@@ -1,0 +1,66 @@
+{{- $exporter := .Values.exporter | default dict }}
+{{- if (default false $exporter.enabled) }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "farm-drone-ml-data.fullname" . }}-exporter
+  labels:
+    {{- include "farm-drone-ml-data.labels" . | nindent 4 }}
+    app.kubernetes.io/component: model-exporter
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "farm-drone-ml-data.name" . }}-exporter
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: model-exporter
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+      nodeSelector:
+        {{- toYaml (default (dict "nvidia.com/gpu.present" "true") $exporter.nodeSelector) | nindent 8 }}
+      tolerations:
+        {{- toYaml (default (list (dict "key" "g5-gpu" "operator" "Exists" "effect" "NoSchedule")) $exporter.tolerations) | nindent 8 }}
+      containers:
+        - name: exporter
+          image: {{ default "pytorch/pytorch:2.4.1-cuda12.1-cudnn9-runtime" $exporter.image | quote }}
+          imagePullPolicy: IfNotPresent
+          command: ["bash", "-lc"]
+          args:
+            - >-
+              python3 -c "import onnx" 2>/dev/null || python3 -m pip install --target /tmp/onnx --no-cache-dir onnx==1.16.1 &&
+              PYTHONPATH=/tmp/onnx${PYTHONPATH:+:${PYTHONPATH}} python3 /opt/exporter/export_onnx.py
+          env:
+            - name: MODEL_DIR
+              value: {{ default "/data/perception/models/v6" $exporter.modelDir | quote }}
+            - name: CHECKPOINT
+              value: {{ default "/data/perception/models/v6/detector.pt" $exporter.checkpoint | quote }}
+            - name: OUTPUT
+              value: {{ default "/data/perception/models/v6/detector.onnx" $exporter.output | quote }}
+          resources:
+            requests:
+              cpu: "2"
+              memory: 8Gi
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: "4"
+              memory: 16Gi
+              nvidia.com/gpu: "1"
+          volumeMounts:
+            - name: perception-data
+              mountPath: {{ default "/data/perception" .Values.dataPath | quote }}
+            - name: exporter-script
+              mountPath: /opt/exporter
+              readOnly: true
+      volumes:
+        - name: perception-data
+          persistentVolumeClaim:
+            claimName: {{ include "farm-drone-ml-data.fullname" . }}
+        - name: exporter-script
+          configMap:
+            name: {{ include "farm-drone-ml-data.fullname" . }}-exporter
+            defaultMode: 0555
+{{- end }}

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: farm-drone-ml-data
+description: Persistent perception datasets, models, and evaluation artifacts for the farm drone
+type: application
+version: 0.4.0
+appVersion: "0.1.0"

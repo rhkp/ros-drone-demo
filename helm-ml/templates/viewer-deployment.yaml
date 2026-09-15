@@ -1,0 +1,70 @@
+{{- $viewer := .Values.viewer | default dict }}
+{{- if (default false $viewer.enabled) }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "farm-drone-ml-data.fullname" . }}-viewer
+  labels:
+    {{- include "farm-drone-ml-data.labels" . | nindent 4 }}
+    app.kubernetes.io/component: perception-showcase
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "farm-drone-ml-data.name" . }}-viewer
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      annotations:
+        checksum/viewer-script: {{ .Files.Get "viewer/server.py" | sha256sum }}
+      labels:
+        app.kubernetes.io/name: {{ include "farm-drone-ml-data.name" . }}-viewer
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: perception-showcase
+    spec:
+      containers:
+        - name: viewer
+          image: {{ default "registry.access.redhat.com/ubi9/python-311:latest" $viewer.image | quote }}
+          imagePullPolicy: IfNotPresent
+          command: ["python3", "/opt/viewer/server.py"]
+          env:
+            - name: DATA_ROOT
+              value: {{ default "/data/perception" .Values.dataPath | quote }}
+            - name: PORT
+              value: {{ default 8080 $viewer.port | quote }}
+          ports:
+            - name: http
+              containerPort: {{ default 8080 $viewer.port }}
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: perception-data
+              mountPath: {{ default "/data/perception" .Values.dataPath | quote }}
+              readOnly: true
+            - name: viewer-script
+              mountPath: /opt/viewer
+              readOnly: true
+      volumes:
+        - name: perception-data
+          persistentVolumeClaim:
+            claimName: {{ include "farm-drone-ml-data.fullname" . }}
+        - name: viewer-script
+          configMap:
+            name: {{ include "farm-drone-ml-data.fullname" . }}-viewer
+            defaultMode: 0555
+{{- end }}

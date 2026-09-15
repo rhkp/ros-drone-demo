@@ -1,0 +1,65 @@
+{{- $curator := .Values.curator | default dict }}
+{{- if (default false $curator.enabled) }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "farm-drone-ml-data.fullname" . }}-curator
+  labels:
+    {{- include "farm-drone-ml-data.labels" . | nindent 4 }}
+    app.kubernetes.io/component: dataset-curator
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "farm-drone-ml-data.name" . }}-curator
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: dataset-curator
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+      # The ML PVC is RWO; keep the one-shot job with its existing consumers.
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/name
+                    operator: In
+                    values:
+                      - {{ include "farm-drone-ml-data.name" . }}-viewer
+                      - {{ include "farm-drone-ml-data.name" . }}-storage-anchor
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: curator
+          image: {{ default "registry.access.redhat.com/ubi9/python-311:latest" $curator.image | quote }}
+          imagePullPolicy: IfNotPresent
+          command: ["python3", "/opt/curator/assemble_dataset.py"]
+          env:
+            - name: DATA_ROOT
+              value: {{ default "/data/perception" .Values.dataPath | quote }}
+            - name: SOURCE_DATASETS
+              value: {{ join "," (default (list "flight-v3") $curator.sources) | quote }}
+            - name: OUTPUT_DIR
+              value: {{ default "/data/perception/datasets/curated-v6" $curator.outputDir | quote }}
+            - name: NEGATIVE_RATIO
+              value: {{ default "0.35" $curator.negativeRatio | quote }}
+            - name: SPLIT_MAP
+              value: {{ toJson (default dict $curator.splitMap) | quote }}
+          volumeMounts:
+            - name: perception-data
+              mountPath: {{ default "/data/perception" .Values.dataPath | quote }}
+            - name: curator-script
+              mountPath: /opt/curator
+              readOnly: true
+      volumes:
+        - name: perception-data
+          persistentVolumeClaim:
+            claimName: {{ include "farm-drone-ml-data.fullname" . }}
+        - name: curator-script
+          configMap:
+            name: {{ include "farm-drone-ml-data.fullname" . }}-curator
+            defaultMode: 0555
+{{- end }}

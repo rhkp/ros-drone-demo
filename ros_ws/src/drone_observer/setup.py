@@ -22,6 +22,9 @@ setup(
             'farm_map_publisher = drone_observer.farm_map_publisher:main',
             'dynamic_obstacle_bridge = drone_observer.dynamic_obstacle_bridge:main',
             'nav2_cmd_vel_adapter = drone_observer.nav2_cmd_vel_adapter:main',
+            'dataset_recorder = drone_observer.dataset_recorder:main',
+            'vision_detector = drone_observer.vision_detector:main',
+            'shadow_evaluator = drone_observer.shadow_evaluator:main',
         ],
     },
 )

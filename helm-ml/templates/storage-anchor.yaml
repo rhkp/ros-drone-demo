@@ -1,0 +1,32 @@
+{{- $anchor := .Values.anchor | default dict }}
+{{- if (default false $anchor.enabled) }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "farm-drone-ml-data.fullname" . }}-storage-anchor
+  labels:
+    {{- include "farm-drone-ml-data.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "farm-drone-ml-data.name" . }}-storage-anchor
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "farm-drone-ml-data.name" . }}-storage-anchor
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: storage-anchor
+          image: {{ default "registry.access.redhat.com/ubi9/ubi-minimal:9.5" $anchor.image | quote }}
+          command: ["/bin/sh", "-c", "sleep infinity"]
+          volumeMounts:
+            - name: perception-data
+              mountPath: {{ default "/data/perception" .Values.dataPath | quote }}
+      volumes:
+        - name: perception-data
+          persistentVolumeClaim:
+            claimName: {{ include "farm-drone-ml-data.fullname" . }}
+{{- end }}

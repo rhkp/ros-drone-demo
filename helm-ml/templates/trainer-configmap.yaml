@@ -1,0 +1,13 @@
+{{- $trainer := .Values.trainer | default dict }}
+{{- if (default false $trainer.enabled) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "farm-drone-ml-data.fullname" . }}-trainer
+  labels:
+    {{- include "farm-drone-ml-data.labels" . | nindent 4 }}
+    app.kubernetes.io/component: model-trainer
+data:
+  train_detector.py: |-
+{{ .Files.Get "trainer/train_detector.py" | indent 4 }}
+{{- end }}

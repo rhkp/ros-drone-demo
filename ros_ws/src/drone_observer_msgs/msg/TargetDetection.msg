@@ -5,3 +5,8 @@ string target_type
 float32 confidence
 geometry_msgs/Pose pose
 string image_path
+float32 bbox_x_min
+float32 bbox_y_min
+float32 bbox_x_max
+float32 bbox_y_max
+string model_version

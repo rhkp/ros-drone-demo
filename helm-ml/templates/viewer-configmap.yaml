@@ -1,0 +1,13 @@
+{{- $viewer := .Values.viewer | default dict }}
+{{- if (default false $viewer.enabled) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "farm-drone-ml-data.fullname" . }}-viewer
+  labels:
+    {{- include "farm-drone-ml-data.labels" . | nindent 4 }}
+    app.kubernetes.io/component: perception-showcase
+data:
+  server.py: |-
+{{ .Files.Get "viewer/server.py" | indent 4 }}
+{{- end }}

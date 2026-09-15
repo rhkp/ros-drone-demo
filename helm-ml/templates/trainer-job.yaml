@@ -1,0 +1,70 @@
+{{- $trainer := .Values.trainer | default dict }}
+{{- if (default false $trainer.enabled) }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "farm-drone-ml-data.fullname" . }}-trainer
+  labels:
+    {{- include "farm-drone-ml-data.labels" . | nindent 4 }}
+    app.kubernetes.io/component: model-trainer
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "farm-drone-ml-data.name" . }}-trainer
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: model-trainer
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+      nodeSelector:
+        {{- toYaml (default (dict "nvidia.com/gpu.present" "true") $trainer.nodeSelector) | nindent 8 }}
+      tolerations:
+        {{- toYaml (default (list (dict "key" "g5-gpu" "operator" "Exists" "effect" "NoSchedule")) $trainer.tolerations) | nindent 8 }}
+      containers:
+        - name: trainer
+          image: {{ default "pytorch/pytorch:2.4.1-cuda12.1-cudnn9-runtime" $trainer.image | quote }}
+          imagePullPolicy: IfNotPresent
+          command: ["python3", "/opt/trainer/train_detector.py"]
+          env:
+            - name: DATASET_DIR
+              value: {{ default "/data/perception/datasets/curated-v2" $trainer.datasetDir | quote }}
+            - name: MODEL_DIR
+              value: {{ default "/data/perception/models/v1" $trainer.modelDir | quote }}
+            - name: EVAL_DIR
+              value: {{ default "/data/perception/evaluations/v1" $trainer.evalDir | quote }}
+            - name: EPOCHS
+              value: {{ default 5 $trainer.epochs | quote }}
+            - name: BATCH_SIZE
+              value: {{ default 4 $trainer.batchSize | quote }}
+            - name: SEED
+              value: {{ default "20260914" $trainer.seed | quote }}
+            - name: CLASS_NAMES
+              value: "well,storage_silo,cattle_shed,produce_barn,crop_field,greenhouse,water_tank"
+          resources:
+            requests:
+              cpu: {{ default "2" $trainer.cpuRequest | quote }}
+              memory: {{ default "8Gi" $trainer.memoryRequest | quote }}
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: {{ default "4" $trainer.cpuLimit | quote }}
+              memory: {{ default "16Gi" $trainer.memoryLimit | quote }}
+              nvidia.com/gpu: "1"
+          volumeMounts:
+            - name: perception-data
+              mountPath: {{ default "/data/perception" .Values.dataPath | quote }}
+            - name: trainer-script
+              mountPath: /opt/trainer
+              readOnly: true
+      volumes:
+        - name: perception-data
+          persistentVolumeClaim:
+            claimName: {{ include "farm-drone-ml-data.fullname" . }}
+        - name: trainer-script
+          configMap:
+            name: {{ include "farm-drone-ml-data.fullname" . }}-trainer
+            defaultMode: 0555
+{{- end }}

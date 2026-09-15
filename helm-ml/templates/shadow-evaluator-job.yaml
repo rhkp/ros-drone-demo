@@ -1,0 +1,73 @@
+{{- $evaluator := .Values.shadowEvaluator | default dict }}
+{{- if (default false $evaluator.enabled) }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "farm-drone-ml-data.fullname" . }}-shadow-evaluator
+  labels:
+    {{- include "farm-drone-ml-data.labels" . | nindent 4 }}
+    app.kubernetes.io/component: shadow-evaluator
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "farm-drone-ml-data.name" . }}-shadow-evaluator
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: shadow-evaluator
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/name
+                    operator: In
+                    values:
+                      - {{ include "farm-drone-ml-data.name" . }}-viewer
+                      - {{ include "farm-drone-ml-data.name" . }}-storage-anchor
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: shadow-evaluator
+          image: {{ default "quay.io/rhkp/hbr-drone-observer:v0.8.0" $evaluator.image | quote }}
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/bash", "-lc"]
+          args:
+            - >-
+              source /opt/drone/scripts/ros-env.sh &&
+              source /opt/drone_ws/install/setup.bash &&
+              exec ros2 run drone_observer shadow_evaluator
+          env:
+            - name: RMW_IMPLEMENTATION
+              value: rmw_zenoh_cpp
+            - name: ZENOH_ROUTER_ENDPOINT
+              value: {{ default "tcp/farm-drone-ros-drone-demo-zenoh.arhkp1-farm-drone.svc.cluster.local:7447" $evaluator.zenohEndpoint | quote }}
+            - name: DRONE_SHADOW_DURATION_SEC
+              value: {{ default "240" $evaluator.durationSec | quote }}
+            - name: DRONE_SHADOW_IOU_THRESHOLD
+              value: {{ default "0.5" $evaluator.iouThreshold | quote }}
+            - name: DRONE_SHADOW_MODEL_VERSION
+              value: {{ default "v6" $evaluator.modelVersion | quote }}
+            - name: DRONE_SHADOW_REPORT
+              value: {{ default "/data/perception/evaluations/shadow-v6/report.json" $evaluator.outputPath | quote }}
+            - name: DRONE_SCENARIO_FILE
+              value: /opt/drone-demo/config/scenarios.yaml
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          volumeMounts:
+            - name: perception-data
+              mountPath: {{ default "/data/perception" .Values.dataPath | quote }}
+      volumes:
+        - name: perception-data
+          persistentVolumeClaim:
+            claimName: {{ include "farm-drone-ml-data.fullname" . }}
+{{- end }}

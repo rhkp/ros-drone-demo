@@ -1,0 +1,23 @@
+{{- $viewer := .Values.viewer | default dict }}
+{{- $route := $viewer.route | default dict }}
+{{- if and (default false $viewer.enabled) (default false $route.enabled) }}
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ include "farm-drone-ml-data.fullname" . }}-viewer
+  labels:
+    {{- include "farm-drone-ml-data.labels" . | nindent 4 }}
+    app.kubernetes.io/component: perception-showcase
+spec:
+  {{- with $route.host }}
+  host: {{ . | quote }}
+  {{- end }}
+  to:
+    kind: Service
+    name: {{ include "farm-drone-ml-data.fullname" . }}-viewer
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+{{- end }}
