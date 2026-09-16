@@ -4,6 +4,7 @@ set -euo pipefail
 source /opt/rmf/scripts/ros-env.sh
 WORLD_FILE="${DRONE_WORLD_FILE:-/opt/drone-demo/worlds/farm_survey.sdf}"
 WORLD_NAME="${DRONE_WORLD_NAME:-farm_survey}"
+export GZ_SIM_RESOURCE_PATH="/opt/drone-demo${GZ_SIM_RESOURCE_PATH:+:${GZ_SIM_RESOURCE_PATH}}"
 export ZENOH_CONFIG_OVERRIDE="mode=\"client\";connect/endpoints=[\"${ZENOH_ROUTER_ENDPOINT}\"]"
 
 openbox_pid=""

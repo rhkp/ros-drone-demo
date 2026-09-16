@@ -3,11 +3,12 @@ ARG BASE_TAG=v0.1.0
 FROM ${REGISTRY}/hbr-rmf-demos:${BASE_TAG}
 
 USER 0
-RUN mkdir -p /opt/drone-demo/worlds /opt/drone-demo/config /opt/drone-demo/scripts
+RUN mkdir -p /opt/drone-demo/worlds /opt/drone-demo/config /opt/drone-demo/scripts /opt/drone-demo/assets
 COPY worlds/farm_survey.sdf /opt/drone-demo/worlds/farm_survey.sdf
 COPY config/scenarios.yaml /opt/drone-demo/config/scenarios.yaml
 COPY scripts/launch-world.sh /opt/drone-demo/scripts/launch-world.sh
 COPY scripts/route_visualizer.py /opt/drone-demo/scripts/route_visualizer.py
+COPY components/simulation-world/assets /opt/drone-demo/assets
 RUN chmod 0755 /opt/drone-demo/scripts/launch-world.sh /opt/drone-demo/scripts/route_visualizer.py && chown -R 1001:0 /opt/drone-demo && chmod -R g=u /opt/drone-demo
 USER 1001
 

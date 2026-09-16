@@ -1,0 +1,116 @@
+license: CC0-1.0
+assets:
+  storage_silo_east:
+    purpose: material-only visual skin
+    maps:
+      albedo: materials/storage_silo/storage_silo_albedo_2k.png
+      roughness: materials/storage_silo/storage_silo_roughness_2k.png
+    source_asset: Corrugated Iron 03
+    source_url: https://polyhaven.com/a/corrugated_iron_03
+    source_maps:
+      albedo: corrugated_iron_03_diff_2k.png
+      roughness: corrugated_iron_03_rough_2k.png
+    processing: warm light-brown color grade applied to the albedo map for Gazebo visibility; surface detail preserved
+    sha256:
+      albedo: e23dcc27e7696ecfb3464192ef2598148d8211a9f3950ff442f4553406b29805
+      roughness: 7edc379acb18997eed403c6689817c5a1f670208d0c3dcec189bf1428ead7c2c
+    geometry_changed: false
+    pose_changed: false
+    collision_changed: false
+  farmhouse_body:
+    purpose: material-only visual skin for farmhouse body
+    maps:
+      albedo: materials/farmhouse_body/farmhouse_body_albedo_2k.png
+      roughness: materials/farmhouse_body/farmhouse_body_roughness_2k.png
+    source_asset: Synthetic Wood
+    source_maps:
+      albedo: synthetic_wood_diff_2k.png
+      roughness: synthetic_wood_rough_2k.png
+    source_url: https://polyhaven.com/a/synthetic_wood
+    sha256:
+      albedo: 87b3292f2eb034f7da8cc61f9fb2b8a14bd6c9cb485c8721d32c6979768a53bb
+      roughness: 2964a49fa7e9a7eea2cc7a9d926336d5339b0d21ca12630f40781e39f966af11
+    geometry_changed: false
+    pose_changed: false
+    collision_changed: false
+  cattle_shed_body:
+    purpose: material-only visual skin for cattle shed body
+    maps:
+      albedo: materials/cattle_shed_body/cattle_shed_body_albedo_2k.png
+      roughness: materials/cattle_shed_body/cattle_shed_body_roughness_2k.png
+    source_asset: Weathered Brown Planks
+    source_maps:
+      albedo: weathered_brown_planks_diff_2k.png
+      roughness: weathered_brown_planks_rough_2k.png
+    source_url: https://polyhaven.com/a/weathered_brown_planks
+    processing: albedo lifted 18 percent to keep the shed readable under the Gazebo lighting
+    sha256:
+      albedo: bb70fa64df72ff8c27fa56f7af857949537b86eaba70cf70aa1eb3b144aea604
+      roughness: 037921ac51ce9fc542a844dc9d247a9ee6beb8b8f8f53742e7d3bb945b4dc74a
+    geometry_changed: false
+    pose_changed: false
+    collision_changed: false
+  produce_barn_body:
+    purpose: material-only visual skin for produce barn body
+    maps:
+      albedo: materials/produce_barn_body/produce_barn_body_albedo_2k.png
+      roughness: materials/produce_barn_body/produce_barn_body_roughness_2k.png
+    source_asset: Distressed Painted Planks
+    source_maps:
+      albedo: distressed_painted_planks_diff_2k.png
+      roughness: distressed_painted_planks_rough_2k.png
+    source_url: https://polyhaven.com/a/distressed_painted_planks
+    sha256:
+      albedo: 353ade658d68eb7d8ba49182042d07c0151b2f3c21240c36086b6db07135925b
+      roughness: 022cbc42f690f29cef8fac8327ab587e91d70926f427b751ffafa9452e5d5fbc
+    geometry_changed: false
+    pose_changed: false
+    collision_changed: false
+  dirt_ground:
+    purpose: reusable material for farm roads, access lane, and yard surfaces
+    maps:
+      albedo: materials/dirt_ground/dirt_ground_albedo_2k.png
+      roughness: materials/dirt_ground/dirt_ground_roughness_2k.png
+    source_asset: Dirt
+    source_maps:
+      albedo: dirt_diff_2k.png
+      roughness: dirt_rough_2k.png
+    source_url: https://polyhaven.com/a/dirt
+    sha256:
+      albedo: f0fee6965209d08fd073067c9c61cefc815fecdede90070b361e3f8c47c87801
+      roughness: 620354e281625391002fba6e9bcb1123859b434370f7ed6f046f4e8cb107f6f8
+    geometry_changed: false
+    pose_changed: false
+    collision_changed: false
+  concrete:
+    purpose: reusable material for the station deck, well ring, and chimney
+    maps:
+      albedo: materials/concrete/concrete_albedo_2k.png
+      roughness: materials/concrete/concrete_roughness_2k.png
+    source_asset: Concrete Wall 003
+    source_maps:
+      albedo: concrete_wall_003_diff_2k.png
+      roughness: concrete_wall_003_rough_2k.png
+    source_url: https://polyhaven.com/a/concrete_wall_003
+    sha256:
+      albedo: 21f12fccfa211be4efb2d0581125e4f2262506755b1d12a7310a2fea637ce096
+      roughness: 91362fe510ffd370e125cb7157a21f0f4bc7c49bedcdd808621a3d465b460752
+    geometry_changed: false
+    pose_changed: false
+    collision_changed: false
+  hay:
+    purpose: reusable straw material for hay bales
+    maps:
+      albedo: materials/hay/hay_albedo_2k.png
+      roughness: materials/hay/hay_roughness_2k.png
+    source_asset: Thatch Roof Angled
+    source_maps:
+      albedo: thatch_roof_angled_diff_2k.png
+      roughness: thatch_roof_angled_rough_2k.png
+    source_url: https://polyhaven.com/a/thatch_roof_angled
+    sha256:
+      albedo: 32a320cdbdcf530f40f371b81183beda489dbfdfc8ec7daec196e86426970812
+      roughness: 81c9ace60bdeaeb88c1edd08823831958c035763f3ce46eda6b71dc6c8383e65
+    geometry_changed: false
+    pose_changed: false
+    collision_changed: false
