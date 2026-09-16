@@ -96,3 +96,27 @@ trainer:
     - key: g5-gpu
       operator: Exists
       effect: NoSchedule
+
+# One-shot offline evaluation on a reserved test split. Keep the detector and
+# trainer disabled while this GPU job runs on a single-GPU node.
+heldOutEvaluator:
+  enabled: false
+  image: pytorch/pytorch:2.4.1-cuda12.1-cudnn9-runtime
+  datasetDir: /data/perception/datasets/curated-v7
+  split: test
+  modelPath: /data/perception/models/v7/detector.pt
+  reportPath: /data/perception/evaluations/v7-held-out/report.json
+  modelVersion: v7
+  classNames: well,storage_silo,cattle_shed,produce_barn,crop_field,greenhouse,water_tank
+  confidenceThreshold: "0.35"
+  iouThreshold: "0.5"
+  minMacroPrecision: "0.80"
+  minMacroRecall: "0.80"
+  minClassRecall: "0.60"
+  enforceThresholds: "false"
+  nodeSelector:
+    nvidia.com/gpu.present: "true"
+  tolerations:
+    - key: g5-gpu
+      operator: Exists
+      effect: NoSchedule

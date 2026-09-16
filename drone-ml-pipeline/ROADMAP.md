@@ -16,7 +16,9 @@ behavior.
 The corrected training loop is operational. The curated v7 dataset contains
 versioned images, labels, and sampled negatives from multiple flights, with
 held-out episodes kept separate for validation. The free PyTorch/torchvision
-baseline produced a Faster R-CNN v7 checkpoint and was validated offline.
+baseline produced a Faster R-CNN v7 checkpoint and was validated on the
+training Job's validation split; a final reserved-test report is the next
+numeric gate.
 
 The active runtime is now the PyTorch checkpoint itself:
 `models/v7/detector.pt`. It is deployed in the independent ML namespace as a
@@ -37,9 +39,10 @@ and inference observations into the mission `report.json`. The observer no
 longer subscribes to `/drone/target_truth` for runtime mission decisions.
 
 The ONNX export/runtime experiment produced reshape errors and has been moved to
-`archived/onnx/`. It is not part of the active workflow. The next gate is a
-formal GPU-backed perception-validation report for v7, if numeric accuracy
-evidence is needed beyond the Showcase.
+`archived/onnx/`. It is not part of the active workflow. The next gate is the
+formal held-out GPU-backed evaluation report for v7. The new evaluator scores a
+reserved `test` split and writes a versioned JSON report without affecting live
+mission behavior.
 
 The showcase recorder now stores camera predictions beside each captured frame,
 and the ML viewer overlays simulator truth in yellow and model predictions in
@@ -243,7 +246,7 @@ not contain nearly identical views.
 
 Deliverable: a small dataset and a script that can reproduce it.
 
-### Phase 2 — Train and evaluate a free baseline
+### Phase 2 — Train and evaluate a free baseline — training complete; held-out gate pending
 
 Use the free torchvision Faster R-CNN baseline first, then consider another
 open detector stack only if the baseline is insufficient. Train on the
@@ -252,6 +255,9 @@ per-class precision, recall, missed detections, false positives, pose error, and
 inference latency.
 
 Deliverable: a versioned model artifact and a reproducible evaluation JSON/report.
+The repository now includes `scripts/evaluate-model.sh` and an OpenShift Job
+for the reserved `test` split; run it before promoting v7 as the validated
+model.
 
 ### Phase 3 — Add runtime inference — complete
 

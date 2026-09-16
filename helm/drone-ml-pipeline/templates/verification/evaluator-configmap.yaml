@@ -1,0 +1,13 @@
+{{- $evaluator := .Values.heldOutEvaluator | default dict }}
+{{- if (default false $evaluator.enabled) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "farm-drone-ml-data.fullname" . }}-held-out-evaluator
+  labels:
+    {{- include "farm-drone-ml-data.labels" . | nindent 4 }}
+    app.kubernetes.io/component: held-out-evaluator
+data:
+  evaluate_detector.py: |-
+{{ .Files.Get "verification/evaluate_detector.py" | indent 4 }}
+{{- end }}

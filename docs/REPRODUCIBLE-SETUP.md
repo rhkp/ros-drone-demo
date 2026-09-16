@@ -256,12 +256,29 @@ show both kinds of boxes for frames where the model produced a prediction:
 - green = camera-model prediction;
 - the prediction caption = class, confidence, model version, and count.
 
-This visual comparison is the primary validation/demo output. The optional
-perception validator can additionally calculate IoU-based precision and recall,
-but it is not required to inspect or demonstrate the captured predictions. The
-observer also consumes `/drone/camera_detections` during `INSPECT`; missed model
-classes are recorded in the mission report while the drone still returns and
-lands safely.
+This visual comparison is the primary validation/demo output. For the numeric
+model-quality gate, reserve one complete episode as `split=test` and run the
+held-out evaluator. It calculates IoU-based precision and recall, false
+positives, missed detections, and latency without changing the live mission.
+The observer also consumes `/drone/camera_detections` during `INSPECT`; missed
+model classes are recorded in the mission report while the drone still returns
+and lands safely.
+
+Run it locally when the dataset and checkpoint are mounted at their configured
+paths:
+
+```bash
+EVAL_SPLIT=test \
+DATASET_DIR=/data/perception/datasets/curated-v7 \
+MODEL_PATH=/data/perception/models/v7/detector.pt \
+REPORT_PATH=/data/perception/evaluations/v7-held-out/report.json \
+./scripts/evaluate-model.sh
+```
+
+The evaluator refuses to use the training split. It reports whether the
+starting promotion gate passed: 80% macro precision, 80% macro recall, and at
+least 60% recall for every class. Use `--enforce-thresholds` when a failing
+report should return a non-zero exit code.
 
 ## Safe reinstall and data preservation
 

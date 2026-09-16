@@ -1,0 +1,91 @@
+{{- $evaluator := .Values.heldOutEvaluator | default dict }}
+{{- if (default false $evaluator.enabled) }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "farm-drone-ml-data.fullname" . }}-held-out-evaluator
+  labels:
+    {{- include "farm-drone-ml-data.labels" . | nindent 4 }}
+    app.kubernetes.io/component: held-out-evaluator
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "farm-drone-ml-data.name" . }}-held-out-evaluator
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: held-out-evaluator
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+      nodeSelector:
+        {{- toYaml (default (dict "nvidia.com/gpu.present" "true") $evaluator.nodeSelector) | nindent 8 }}
+      tolerations:
+        {{- toYaml (default (list (dict "key" "g5-gpu" "operator" "Exists" "effect" "NoSchedule")) $evaluator.tolerations) | nindent 8 }}
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/name
+                    operator: In
+                    values:
+                      - {{ include "farm-drone-ml-data.name" . }}-viewer
+                      - {{ include "farm-drone-ml-data.name" . }}-storage-anchor
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: held-out-evaluator
+          image: {{ default "pytorch/pytorch:2.4.1-cuda12.1-cudnn9-runtime" $evaluator.image | quote }}
+          imagePullPolicy: IfNotPresent
+          command: ["python3", "/opt/evaluator/evaluate_detector.py"]
+          env:
+            - name: DATASET_DIR
+              value: {{ default "/data/perception/datasets/curated-v6" $evaluator.datasetDir | quote }}
+            - name: EVAL_SPLIT
+              value: {{ default "test" $evaluator.split | quote }}
+            - name: MODEL_PATH
+              value: {{ default "/data/perception/models/v7/detector.pt" $evaluator.modelPath | quote }}
+            - name: REPORT_PATH
+              value: {{ default "/data/perception/evaluations/v7-held-out/report.json" $evaluator.reportPath | quote }}
+            - name: MODEL_VERSION
+              value: {{ default "v7" $evaluator.modelVersion | quote }}
+            - name: CLASS_NAMES
+              value: {{ default "well,storage_silo,cattle_shed,produce_barn,crop_field,greenhouse,water_tank" $evaluator.classNames | quote }}
+            - name: CONFIDENCE_THRESHOLD
+              value: {{ default "0.35" $evaluator.confidenceThreshold | quote }}
+            - name: IOU_THRESHOLD
+              value: {{ default "0.5" $evaluator.iouThreshold | quote }}
+            - name: MIN_MACRO_PRECISION
+              value: {{ default "0.80" $evaluator.minMacroPrecision | quote }}
+            - name: MIN_MACRO_RECALL
+              value: {{ default "0.80" $evaluator.minMacroRecall | quote }}
+            - name: MIN_CLASS_RECALL
+              value: {{ default "0.60" $evaluator.minClassRecall | quote }}
+            - name: ENFORCE_THRESHOLDS
+              value: {{ default "false" $evaluator.enforceThresholds | quote }}
+          resources:
+            requests:
+              cpu: {{ default "2" $evaluator.cpuRequest | quote }}
+              memory: {{ default "8Gi" $evaluator.memoryRequest | quote }}
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: {{ default "4" $evaluator.cpuLimit | quote }}
+              memory: {{ default "16Gi" $evaluator.memoryLimit | quote }}
+              nvidia.com/gpu: "1"
+          volumeMounts:
+            - name: perception-data
+              mountPath: {{ default "/data/perception" .Values.dataPath | quote }}
+            - name: evaluator-script
+              mountPath: /opt/evaluator
+              readOnly: true
+      volumes:
+        - name: perception-data
+          persistentVolumeClaim:
+            claimName: {{ include "farm-drone-ml-data.fullname" . }}
+        - name: evaluator-script
+          configMap:
+            name: {{ include "farm-drone-ml-data.fullname" . }}-held-out-evaluator
+            defaultMode: 0555
+{{- end }}

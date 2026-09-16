@@ -129,7 +129,67 @@ not subscribe to `/drone/target_truth`. The farm observer consumes this topic
 during `INSPECT`, so runtime mission detections come from the camera model.
 Simulator truth remains an offline labeling and scoring source only.
 
-## Perception validation
+## Held-out model evaluation
+
+The recommended numeric gate evaluates the trained checkpoint against a
+reserved `test` episode. It reads only `images/test` and `labels/test`, never
+changes the dataset, and writes a versioned JSON report to the ML PVC. The
+repository also contains a small shell entry point for local or mounted-volume
+use:
+
+```bash
+EVAL_SPLIT=test \
+DATASET_DIR=/data/perception/datasets/curated-v7 \
+MODEL_PATH=/data/perception/models/v7/detector.pt \
+REPORT_PATH=/data/perception/evaluations/v7-held-out/report.json \
+./scripts/evaluate-model.sh
+```
+
+For the GPU-backed OpenShift run, first ensure the test episode was curated
+with `split=test`, then disable the detector/trainer while the single GPU is
+reserved for the evaluator:
+
+```bash
+helm upgrade farm-drone-ml-data ./helm/drone-ml-pipeline \
+  --namespace farm-drone-ml --reuse-values \
+  --set detector.enabled=false \
+  --set trainer.enabled=false \
+  --set heldOutEvaluator.enabled=true \
+  --wait
+
+EVALUATOR_JOB=$(oc get job -n farm-drone-ml \
+  -l app.kubernetes.io/component=held-out-evaluator \
+  -o jsonpath='{.items[0].metadata.name}')
+oc wait -n farm-drone-ml --for=condition=complete \
+  "job/${EVALUATOR_JOB}" --timeout=60m
+oc logs -n farm-drone-ml "job/${EVALUATOR_JOB}"
+```
+
+The report appears under `evaluations/v7-held-out/report.json` and the
+Showcase displays it in the Evaluation section. The evaluator records the
+model version, split, device, IoU/confidence thresholds, per-class precision
+and recall, false positives, missed detections, and latency. It refuses to
+evaluate the training split. Add `--enforce-thresholds` locally, or set
+`heldOutEvaluator.enforceThresholds=true` in Helm, to fail the job when the
+starting gate is not met.
+
+The current curated datasets contain `train` and `validation` only. Do not use
+`validation` as the final promotion claim: capture one complete additional
+episode, curate it with `splitMap: {flight-test-v1: test}`, and point
+`heldOutEvaluator.datasetDir` at that new curated dataset. Until then, the
+evaluator intentionally refuses to produce a final held-out report.
+
+Re-enable the viewer and storage anchor after the GPU Job completes:
+
+```bash
+helm upgrade farm-drone-ml-data ./helm/drone-ml-pipeline \
+  --namespace farm-drone-ml --reuse-values \
+  --set heldOutEvaluator.enabled=false \
+  --set viewer.enabled=true --set anchor.enabled=true \
+  --wait
+```
+
+## Live perception validation
 
 Run the validator for a bounded mission window after enabling the detector:
 

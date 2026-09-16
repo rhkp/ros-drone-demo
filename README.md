@@ -213,9 +213,10 @@ The Showcase will show the captured dataset and overlay:
 - green boxes for camera-model predictions;
 - confidence percentages and prediction counts.
 
-This visual comparison is the primary demo validation. The optional perception
-validator can additionally write numeric precision/recall results; it is not
-needed to inspect the images.
+This visual comparison is the primary demo validation. For a numeric model
+quality gate, run the separate held-out evaluator against a reserved `test`
+split; it writes precision, recall, missed detections, false positives, and
+latency without changing the live mission.
 
 ## Local run
 
