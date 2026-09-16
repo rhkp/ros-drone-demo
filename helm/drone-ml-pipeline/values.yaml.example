@@ -56,13 +56,14 @@ perceptionValidator:
 # Enable only after publishing an observer image containing dataset_recorder.
 recorder:
   enabled: false
-  image: quay.io/rhkp/hbr-drone-observer:v0.6.9
+  image: quay.io/rhkp/hbr-drone-observer:v1.3.0
   scenario: all
   seed: default
   outputDir: /data/perception/datasets/flight-v6
   captureIntervalSec: 0.5
   maxFrames: 0
   scenarioFile: /opt/drone-demo/config/scenarios.yaml
+  predictionTopic: /drone/camera_detections
 
 # One-shot raw-flight curation. It writes a new dataset and never deletes raw data.
 curator:

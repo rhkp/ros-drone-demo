@@ -85,6 +85,7 @@ def summarize_dataset(directory):
             "image_width": (label_payload or {}).get("image_width", 320),
             "image_height": (label_payload or {}).get("image_height", 240),
             "annotations": (label_payload or {}).get("annotations", []),
+            "predictions": (label_payload or {}).get("predictions", []),
         })
     return {
         "name": directory.name,
@@ -171,7 +172,7 @@ main { max-width:1180px; margin:24px auto; padding:0 22px; } .grid { display:gri
 .card, section { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:18px; } .metric { font-size:30px; font-weight:700; color:var(--accent); }
 .label { color:var(--muted); font-size:13px; } table { width:100%; border-collapse:collapse; } th,td { text-align:left; padding:9px 7px; border-bottom:1px solid var(--line); vertical-align:top; } th { color:var(--muted); font-weight:500; }
 code, pre { color:#c8e7d5; } code { word-break:break-word; } a { color:#8ac7ff; } .empty { color:var(--muted); padding:14px 0; } .gallery { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; }
-.gallery figure { margin:0; background:#111923; border:1px solid var(--line); border-radius:8px; padding:7px; } .thumb { position:relative; line-height:0; } .gallery img { width:100%; height:115px; object-fit:cover; border-radius:5px; background:#0b0f14; } .box { position:absolute; border:2px solid #ffdf5d; box-shadow:0 0 0 1px #13202b; pointer-events:none; } .box span { position:absolute; left:-2px; top:-18px; background:#ffdf5d; color:#10151d; font-size:10px; line-height:16px; padding:0 4px; white-space:nowrap; } figcaption { font-size:11px; color:var(--muted); overflow-wrap:anywhere; margin-top:5px; line-height:1.35; }
+.gallery figure { margin:0; background:#111923; border:1px solid var(--line); border-radius:8px; padding:7px; } .thumb { position:relative; line-height:0; } .gallery img { width:100%; height:115px; object-fit:cover; border-radius:5px; background:#0b0f14; } .box { position:absolute; border:2px solid #ffdf5d; box-shadow:0 0 0 1px #13202b; pointer-events:none; } .box span { position:absolute; left:-2px; top:-18px; background:#ffdf5d; color:#10151d; font-size:10px; line-height:16px; padding:0 4px; white-space:nowrap; } .box.prediction { border-color:#61d095; } .box.prediction span { background:#61d095; } .legend { color:var(--muted); font-size:12px; margin:8px 0 12px; } .legend .truth-key { color:#ffdf5d; } .legend .prediction-key { color:#61d095; } figcaption { font-size:11px; color:var(--muted); overflow-wrap:anywhere; margin-top:5px; line-height:1.35; }
 .pill { display:inline-block; padding:3px 8px; border-radius:999px; background:#24493c; color:#9ef0bd; font-size:12px; } .error { color:#ffb4a9; }
 </style>
 </head>
@@ -182,7 +183,7 @@ code, pre { color:#c8e7d5; } code { word-break:break-word; } a { color:#8ac7ff; 
 <section><h2>Datasets</h2><div id="datasets" class="empty">No datasets recorded yet.</div></section><br>
 <section><h2>Models</h2><div id="models" class="empty">No models trained yet.</div></section><br>
 <section><h2>Evaluation</h2><div id="evaluations" class="empty">No evaluation reports yet.</div></section><br>
-<section><h2>Images and labels</h2><p>Choose a dataset and how many frames to display. Bounding boxes are generated from simulator truth offline and drawn over the camera image for inspection.</p><label for="dataset-select" class="label">Dataset</label> <select id="dataset-select"></select> <label for="image-limit" class="label">Frames</label> <select id="image-limit"><option value="30">First 30</option><option value="100">First 100</option><option value="all" selected>All available</option></select><div id="image-count" class="label"></div><div id="images" class="gallery"><div class="empty">No images recorded yet.</div></div></section>
+<section><h2>Images and predictions</h2><p>Choose a dataset and how many frames to display. Ground-truth boxes are yellow; camera-model predictions are green and include confidence.</p><div class="legend"><span class="truth-key">■ Ground truth</span> &nbsp; <span class="prediction-key">■ Model prediction</span></div><label for="dataset-select" class="label">Dataset</label> <select id="dataset-select"></select> <label for="image-limit" class="label">Frames</label> <select id="image-limit"><option value="30">First 30</option><option value="100">First 100</option><option value="all" selected>All available</option></select><div id="image-count" class="label"></div><div id="images" class="gallery"><div class="empty">No images recorded yet.</div></div></section>
 </main>
 <script>
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -190,6 +191,15 @@ const link = (path, label) => path ? `<a href="/files/${path.split('/').map(enco
 const value = (x) => x === null || x === undefined || x === '' ? '—' : esc(x);
 function table(headers, rows) { return `<table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`; }
 function fileUrl(path) { return `/files/${path.split('/').map(encodeURIComponent).join('/')}`; }
+function boxElement(entry, image, kind) {
+  const box = entry.bbox_pixels || {};
+  const left = 100 * Number(box.x_min || 0) / Number(image.image_width || 320);
+  const top = 100 * Number(box.y_min || 0) / Number(image.image_height || 240);
+  const width = 100 * Number(box.width || 0) / Number(image.image_width || 320);
+  const height = 100 * Number(box.height || 0) / Number(image.image_height || 240);
+  const confidence = kind === 'prediction' && entry.confidence !== undefined ? ` ${(100 * Number(entry.confidence)).toFixed(0)}%` : '';
+  return `<div class="box ${kind}" style="left:${left}%;top:${top}%;width:${width}%;height:${height}%;"><span>${esc(entry.class_name)}${confidence}</span></div>`;
+}
 function renderGallery(dataset) {
   const target = document.querySelector('#images');
   const limit = document.querySelector('#image-limit').value;
@@ -197,16 +207,12 @@ function renderGallery(dataset) {
   document.querySelector('#image-count').textContent = dataset ? `Showing ${images.length} of ${dataset.images} available frame(s)` : '';
   if (!images.length) { target.innerHTML = '<div class="empty">No images recorded yet.</div>'; return; }
   target.innerHTML = images.map(image => {
-    const boxes = (image.annotations || []).map(annotation => {
-      const box = annotation.bbox_pixels || {};
-      const left = 100 * Number(box.x_min || 0) / Number(image.image_width || 320);
-      const top = 100 * Number(box.y_min || 0) / Number(image.image_height || 240);
-      const width = 100 * Number(box.width || 0) / Number(image.image_width || 320);
-      const height = 100 * Number(box.height || 0) / Number(image.image_height || 240);
-      return `<div class="box" style="left:${left}%;top:${top}%;width:${width}%;height:${height}%;"><span>${esc(annotation.class_name)}</span></div>`;
-    }).join('');
+    const boxes = (image.annotations || []).map(annotation => boxElement(annotation, image, 'truth')).join('');
+    const predictions = (image.predictions || []).map(prediction => boxElement(prediction, image, 'prediction')).join('');
     const labelLink = image.label_path ? ` · <a href="${fileUrl(image.label_path)}" target="_blank">labels</a>` : '';
-    return `<figure><div class="thumb"><img loading="lazy" src="${fileUrl(image.path)}" alt="${esc(image.name)}">${boxes}</div><figcaption>${esc(image.path)}<br>${image.annotations.length ? `${image.annotations.length} label(s)` : 'no labels'}${labelLink}</figcaption></figure>`;
+    const truthCount = image.annotations.length ? `${image.annotations.length} truth label(s)` : 'no truth labels';
+    const predictionCount = image.predictions.length ? `${image.predictions.length} prediction(s)` : 'no model predictions';
+    return `<figure><div class="thumb"><img loading="lazy" src="${fileUrl(image.path)}" alt="${esc(image.name)}">${boxes}${predictions}</div><figcaption>${esc(image.path)}<br>${truthCount}; ${predictionCount}${labelLink}</figcaption></figure>`;
   }).join('');
 }
 function populateDatasetSelect(datasets) {
@@ -215,7 +221,10 @@ function populateDatasetSelect(datasets) {
   select.innerHTML = datasets.map(d => `<option value="${esc(d.name)}">${esc(d.name)} — ${d.images} images</option>`).join('');
   const curatedDatasets = datasets.filter(d => d.name.startsWith('curated-'));
   const flightDatasets = datasets.filter(d => d.name.startsWith('flight-'));
-  const preferred = current || (curatedDatasets.length ? curatedDatasets[curatedDatasets.length - 1].name : (flightDatasets.length ? flightDatasets[flightDatasets.length - 1].name : (datasets[0] || {}).name));
+  // Keep the latest prediction-aware capture front and center for demos, while
+  // retaining sensible fallbacks when that dataset is not present yet.
+  const predictionShowcase = datasets.find(d => d.name === 'flight-v8-predictions');
+  const preferred = current || (predictionShowcase || {}).name || (curatedDatasets.length ? curatedDatasets[curatedDatasets.length - 1].name : (flightDatasets.length ? flightDatasets[flightDatasets.length - 1].name : (datasets[0] || {}).name));
   if (preferred) select.value = preferred;
   renderGallery(datasets.find(d => d.name === select.value));
   select.onchange = () => renderGallery(datasets.find(d => d.name === select.value));

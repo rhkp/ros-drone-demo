@@ -15,7 +15,7 @@ import yaml
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo, Image
-from drone_observer_msgs.msg import TargetTruthArray
+from drone_observer_msgs.msg import TargetDetectionArray, TargetTruthArray
 
 from .image_utils import image_to_rgb, write_rgb_png
 from .label_projection import normalize_box, project_target_box
@@ -42,6 +42,9 @@ class DatasetRecorder(Node):
         self.seed = str(self.declare_parameter(
             'seed', os.environ.get('DRONE_DATASET_SEED', 'default')
         ).value)
+        self.prediction_topic = str(self.declare_parameter(
+            'prediction_topic', os.environ.get('DRONE_DETECTION_TOPIC', '/drone/camera_detections')
+        ).value)
         with open(scenario_file, encoding='utf-8') as stream:
             self.config = yaml.safe_load(stream)
         scenarios = self.config.get('scenarios', {})
@@ -67,6 +70,10 @@ class DatasetRecorder(Node):
         self.latest_image = None
         self.latest_pose = None
         self.latest_truth = {}
+        self.latest_predictions = None
+        self.latest_prediction_stamp_ns = 0
+        self.latest_prediction_latency_ms = None
+        self.latest_prediction_model_version = ''
         self.last_capture_time = 0.0
         self.frame_count = 0
         self.started_at = time.time()
@@ -82,9 +89,10 @@ class DatasetRecorder(Node):
         self.create_subscription(CameraInfo, '/drone/camera/camera_info', self.on_camera_info, 10)
         self.create_subscription(Odometry, '/drone/odom', self.on_odom, 10)
         self.create_subscription(TargetTruthArray, '/drone/target_truth', self.on_truth, 10)
+        self.create_subscription(TargetDetectionArray, self.prediction_topic, self.on_predictions, 10)
         self.get_logger().info(
             f'Dataset recorder ready: scenario={self.scenario_name}, output={self.output_dir}, '
-            f'classes={self.class_order}, truth_topic=offline-only'
+            f'classes={self.class_order}, truth_topic=offline-only, prediction_topic={self.prediction_topic}'
         )
 
     def on_camera_info(self, message):
@@ -96,6 +104,46 @@ class DatasetRecorder(Node):
 
     def on_truth(self, message):
         self.latest_truth = {target.id: target for target in message.targets}
+
+    @staticmethod
+    def stamp_ns(message):
+        stamp = message.header.stamp
+        return int(stamp.sec) * 1_000_000_000 + int(stamp.nanosec)
+
+    def on_predictions(self, message):
+        self.latest_predictions = message
+        self.latest_prediction_stamp_ns = self.stamp_ns(message)
+        self.latest_prediction_latency_ms = float(message.inference_latency_ms)
+        self.latest_prediction_model_version = str(message.model_version)
+
+    def prediction_payload(self, image):
+        if self.latest_predictions is None:
+            return []
+        image_stamp_ns = self.stamp_ns(image)
+        if image_stamp_ns and self.latest_prediction_stamp_ns:
+            if abs(image_stamp_ns - self.latest_prediction_stamp_ns) > 2_000_000_000:
+                return []
+        predictions = []
+        for detection in self.latest_predictions.detections:
+            x_min = max(0.0, min(float(image.width), float(detection.bbox_x_min)))
+            y_min = max(0.0, min(float(image.height), float(detection.bbox_y_min)))
+            x_max = max(0.0, min(float(image.width), float(detection.bbox_x_max)))
+            y_max = max(0.0, min(float(image.height), float(detection.bbox_y_max)))
+            if x_max <= x_min or y_max <= y_min:
+                continue
+            predictions.append({
+                'class_name': str(detection.target_type),
+                'confidence': round(float(detection.confidence), 6),
+                'bbox_pixels': {
+                    'x_min': round(x_min, 3), 'y_min': round(y_min, 3),
+                    'x_max': round(x_max, 3), 'y_max': round(y_max, 3),
+                    'width': round(x_max - x_min, 3),
+                    'height': round(y_max - y_min, 3),
+                },
+                'model_version': str(detection.model_version or self.latest_prediction_model_version),
+                'inference_latency_ms': self.latest_prediction_latency_ms,
+            })
+        return predictions
 
     def on_image(self, message):
         self.latest_image = message
@@ -139,6 +187,7 @@ class DatasetRecorder(Node):
 
         annotations = []
         yolo_lines = []
+        predictions = self.prediction_payload(image)
         for target_id, truth in sorted(self.latest_truth.items()):
             target = self.targets.get(target_id)
             if not target or target['type'] not in self.allowed_types:
@@ -183,6 +232,8 @@ class DatasetRecorder(Node):
             'image_width': int(image.width),
             'image_height': int(image.height),
             'annotations': annotations,
+            'predictions': predictions,
+            'prediction_source': self.prediction_topic,
         }, indent=2) + '\n', encoding='utf-8')
         label_txt_path.write_text('\n'.join(yolo_lines) + ('\n' if yolo_lines else ''), encoding='utf-8')
         metadata_path.write_text(json.dumps({
@@ -200,12 +251,16 @@ class DatasetRecorder(Node):
             'camera': model,
             'image': str(image_path.relative_to(self.output_dir)),
             'labels': str(label_json_path.relative_to(self.output_dir)),
+            'prediction_topic': self.prediction_topic,
+            'prediction_model_version': self.latest_prediction_model_version,
+            'prediction_count': len(predictions),
+            'prediction_latency_ms': self.latest_prediction_latency_ms,
             'annotation_count': len(annotations),
         }, indent=2) + '\n', encoding='utf-8')
         self._write_manifest()
         self.get_logger().info(
             f'Captured {frame_name}: {len(annotations)} label(s), '
-            f'{image.width}x{image.height}'
+            f'{len(predictions)} prediction(s), {image.width}x{image.height}'
         )
 
     def _write_manifest(self):

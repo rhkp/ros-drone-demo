@@ -2,6 +2,10 @@
 
 This is intentionally a separate Helm release from `farm-drone`.
 
+For the complete clone/fork workflow, including image publishing, mission
+submission, curation, GPU training, detector deployment, and Showcase checks,
+see [`../../docs/REPRODUCIBLE-SETUP.md`](../../docs/REPRODUCIBLE-SETUP.md).
+
 The farm release is disposable: `helm uninstall farm-drone` may remove resources
 owned by that release. Perception datasets, trained models, and evaluation reports
 must live in this independent namespace and PVC instead.
@@ -10,17 +14,17 @@ Install it with:
 
 ```bash
 helm upgrade --install farm-drone-ml-data ./helm/drone-ml-pipeline \
-  --namespace arhkp1-farm-drone-ml --create-namespace \
+  --namespace farm-drone-ml --create-namespace \
   --values ./helm/drone-ml-pipeline/values.yaml.example --wait
 ```
 
 After the PVC binds, set its backing PV reclaim policy to `Retain`:
 
 ```bash
-PVC=$(oc get pvc -n arhkp1-farm-drone-ml \
+PVC=$(oc get pvc -n farm-drone-ml \
   -l app.kubernetes.io/component=perception-data \
   -o jsonpath='{.items[0].metadata.name}')
-PV=$(oc get pvc "$PVC" -n arhkp1-farm-drone-ml -o jsonpath='{.spec.volumeName}')
+PV=$(oc get pvc "$PVC" -n farm-drone-ml -o jsonpath='{.spec.volumeName}')
 oc patch pv "$PV" --type merge \
   -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'
 ```
@@ -38,29 +42,30 @@ once the recorder or training Job permanently mounts the PVC.
 The example values enable a small read-only viewer in the same project. It mounts
 the perception PVC read-only and provides a human-friendly view of dataset
 versions, sample images, model files, and evaluation JSON. It does not train
-models or modify the data volume. The image gallery defaults to the newest
-`flight-*` dataset, supports switching between dataset versions, and draws the
-offline-generated bounding boxes over each sample image. It can display the
-first 30, first 100, or all available frames so negative ground/field images can
-be audited too.
+models or modify the data volume. The image gallery defaults to
+`flight-v8-predictions` when that dataset exists, otherwise it falls back to the
+newest available flight dataset. It supports switching between dataset versions
+and draws truth and camera-model prediction boxes over each sample image. It can
+display the first 30, first 100, or all available frames so negative ground/field
+images can be audited too.
 
 After installation, get the OpenShift URL with:
 
 ```bash
-oc get route farm-drone-ml-data-viewer -n arhkp1-farm-drone-ml
+oc get route farm-drone-ml-data-viewer -n farm-drone-ml
 ```
 
 For local access without a Route:
 
 ```bash
-oc port-forward -n arhkp1-farm-drone-ml \
+oc port-forward -n farm-drone-ml \
   svc/farm-drone-ml-data-viewer 8080:8080
 ```
 
 Then open `http://127.0.0.1:8080`. The viewer starts with an empty state and
 will automatically show artifacts as the recorder, training Job, and perception
-validator
-write versioned content under `datasets/`, `models/`, and `evaluations/`.
+validator write versioned content under `datasets/`, `models/`, and
+`evaluations/`.
 
 ## Dataset recorder
 
@@ -70,10 +75,10 @@ image, enable it with an override such as:
 
 ```bash
 helm upgrade --install farm-drone-ml-data ./helm/drone-ml-pipeline \
-  --namespace arhkp1-farm-drone-ml \
+  --namespace farm-drone-ml \
   --values ./helm/drone-ml-pipeline/values.yaml.example \
   --set recorder.enabled=true \
-  --set recorder.image=quay.io/rhkp/hbr-drone-observer:v0.6.9 \
+  --set recorder.image=YOUR_OBSERVER_IMAGE \
   --wait
 ```
 
@@ -86,20 +91,19 @@ manifest to the persistent volume. Stop it after the desired flight by setting
 ## Raw-data curation
 
 Run the one-shot curator after a capture with `curator.enabled=true`. It copies
-all labeled frames and a deterministic 35% sample of no-label frames into
-`datasets/curated-v6/`. Raw flight directories are not modified or deleted.
-The curator assigns whole episodes to provisional train/validation splits. In the
-current example, `flight-v3`, `flight-v4`, `flight-crops-v1`, `flight-water-v1`,
-and `flight-v6`
-are training data, while the complete `flight-v5` episode is held out for
-validation. A final test episode is still required before promotion.
+all labeled frames and a deterministic sample of no-label frames into the
+configured curated dataset. Raw flight directories are not modified or deleted.
+The curator assigns whole episodes to provisional train/validation splits;
+reserve at least one complete episode for validation and, ideally, a separate
+episode for a final test.
 
 ## GPU baseline training
 
 The chart includes an optional free PyTorch/torchvision baseline Job. It trains a
-small Faster R-CNN detector from `curated-v6`, uses class-balanced sampling and
-lightweight flips, and writes a checkpoint under `models/v6/` with per-class
-validation metrics under `evaluations/v6/`.
+small Faster R-CNN detector from the configured curated dataset, uses
+class-balanced sampling and lightweight flips, and writes a checkpoint plus
+per-class validation metrics under the configured versioned model and evaluation
+directories.
 It uses one NVIDIA GPU and does not use `/drone/target_truth` at runtime.
 
 Because the PVC is ReadWriteOnce, disable the viewer and storage anchor while
@@ -113,8 +117,10 @@ R-CNN checkpoint:
 
 ```bash
 helm upgrade farm-drone-ml-data ./helm/drone-ml-pipeline \
-  --namespace arhkp1-farm-drone-ml --reuse-values \
-  --set detector.enabled=true --wait
+  --namespace farm-drone-ml --reuse-values \
+  --set detector.enabled=true \
+  --set detector.image=YOUR_OBSERVER_IMAGE \
+  --set detector.modelPath=/data/perception/models/v1/detector.pt --wait
 ```
 
 It subscribes only to `/drone/camera/image_raw` and publishes predictions,
@@ -128,7 +134,7 @@ Run the validator for a bounded mission window after enabling the detector:
 
 ```bash
 helm upgrade farm-drone-ml-data ./helm/drone-ml-pipeline \
-  --namespace arhkp1-farm-drone-ml --reuse-values \
+  --namespace farm-drone-ml --reuse-values \
   --set perceptionValidator.enabled=true --wait
 ```
 
@@ -137,6 +143,10 @@ the Job completes. The validator uses truth only offline to calculate IoU-based
 precision and recall and writes
 `evaluations/perception-v7/report.json`. It never publishes to the live mission
 detection topic.
+
+When the recorder runs alongside the detector, each captured frame stores the
+camera model's predictions in its label JSON. The showcase draws simulator truth
+in yellow and model predictions in green with confidence percentages.
 
 The previous ONNX exporter and ONNX-specific templates are retained under
 `archived/onnx/` for historical reference and are not part of the active Helm

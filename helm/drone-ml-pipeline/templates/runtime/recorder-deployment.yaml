@@ -25,6 +25,14 @@ spec:
     spec:
       securityContext:
         runAsNonRoot: true
+      {{- with ((.Values.placement | default dict).nodeSelector) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with ((.Values.placement | default dict).tolerations) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       # The ML PVC is RWO. Keep the recorder with the viewer/anchor so all
       # consumers share the same node instead of triggering Multi-Attach.
       affinity:
@@ -53,6 +61,8 @@ spec:
               value: rmw_zenoh_cpp
             - name: ZENOH_ROUTER_ENDPOINT
               value: {{ default (include "farm-drone-ml-data.zenohEndpoint" .) $recorder.zenohEndpoint | quote }}
+            - name: DRONE_DETECTION_TOPIC
+              value: {{ default "/drone/camera_detections" $recorder.predictionTopic | quote }}
             - name: DRONE_SCENARIO
               value: {{ default "all" $recorder.scenario | quote }}
             - name: DRONE_DATASET_SEED

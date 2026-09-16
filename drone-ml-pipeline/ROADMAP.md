@@ -36,6 +36,12 @@ formal GPU-backed perception-validation report for v7, followed by updating the
 farm observer image to consume the new detection message schema if the live
 detection stream needs to be shown there.
 
+The showcase recorder now stores camera predictions beside each captured frame,
+and the ML viewer overlays simulator truth in yellow and model predictions in
+green with confidence. The first prediction-aware flight is
+`flight-v8-predictions`; its recorder is stopped after capture so the dataset is
+stable for inspection.
+
 ## Data persistence and reset policy
 
 The farm Helm release is disposable. The 2026-09-14 reinstall showed that its
