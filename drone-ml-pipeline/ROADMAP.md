@@ -30,11 +30,16 @@ it never feeds truth into the detector or mission controller. A live v7 mission
 has completed successfully with all seven targets detected, CUDA enabled, and
 approximately 12.9 ms inference latency.
 
+The farm observer now consumes `/drone/camera_detections` during `INSPECT`. It
+waits for fresh camera predictions, records the strongest allowed prediction per
+class, and writes the model version, confidence, bounding box, missed classes,
+and inference observations into the mission `report.json`. The observer no
+longer subscribes to `/drone/target_truth` for runtime mission decisions.
+
 The ONNX export/runtime experiment produced reshape errors and has been moved to
 `archived/onnx/`. It is not part of the active workflow. The next gate is a
-formal GPU-backed perception-validation report for v7, followed by updating the
-farm observer image to consume the new detection message schema if the live
-detection stream needs to be shown there.
+formal GPU-backed perception-validation report for v7, if numeric accuracy
+evidence is needed beyond the Showcase.
 
 The showcase recorder now stores camera predictions beside each captured frame,
 and the ML viewer overlays simulator truth in yellow and model predictions in
@@ -91,8 +96,7 @@ run survey -> record mission episode -> generate labels -> train detector
 
 `/drone/target_truth` may be used offline to generate training labels and to
 measure evaluation accuracy. It must not be the runtime source of detections.
-The current truth-driven behavior in `observer_node.py` is therefore the main
-piece to replace.
+Runtime mission decisions now use `/drone/camera_detections`.
 
 ## Patterns to reuse from `hp-roscon-flywheel`
 
@@ -249,7 +253,7 @@ inference latency.
 
 Deliverable: a versioned model artifact and a reproducible evaluation JSON/report.
 
-### Phase 3 — Add runtime inference
+### Phase 3 — Add runtime inference — complete
 
 Add a `vision_detector` ROS node that loads the versioned PyTorch checkpoint on
 the GPU and subscribes to `/drone/camera/image_raw`. It publishes real detections without
@@ -261,12 +265,12 @@ confidence detection should not automatically become mission truth.
 
 Deliverable: a live mission can produce detections from camera images alone.
 
-### Phase 4 — Integrate and verify the mission
+### Phase 4 — Integrate and verify the mission — implemented
 
-Replace `_targets_near()` and the fixed confidence in `observer_node.py`. Add the
-detector model version to `TargetDetection` and `report.json`. Keep truth enabled
-only in an explicit evaluation mode that calculates precision/recall after the
-mission.
+The observer now replaces `_targets_near()` and the fixed confidence in
+`observer_node.py`. It adds the detector model version, confidence, bounding box,
+and perception summary to `report.json`. Truth remains available only to the
+separate recorder and evaluator.
 
 Add tests for:
 
@@ -318,9 +322,10 @@ Possible future files:
 This is intentionally distant: do not add Argo CD before the perception model,
 evaluation gate, and persistent OpenShift deployment are useful on their own.
 
-## First coding slice
+## Historical first coding slice
 
-The first implementation should be limited to Phase 0 and the beginning of Phase 1:
+The original first implementation was limited to Phase 0 and the beginning of
+Phase 1:
 
 1. reconcile the target classes;
 2. add target dimensions to configuration;
@@ -332,8 +337,8 @@ This is the fastest way to validate that the rendered camera view and projected
 labels are useful before spending time on model training.
 
 The recorder implementation now exists as an opt-in workload in
-`helm/drone-ml-pipeline`. It
-writes image files plus YOLO and JSON labels to versioned `flight-*` directories,
-and the ML showcase viewer exposes them. The v6 capture and corrected curation
-are complete. The previous v3/v4 model metrics were based on badly positioned
-labels and must not be used as promotion evidence.
+`helm/drone-ml-pipeline`. It writes image files plus YOLO and JSON labels to
+versioned `flight-*` directories, and the ML Showcase exposes them alongside
+camera predictions. The corrected v7 training workflow and v8 prediction-aware
+capture are complete. The previous v3/v4 model metrics were based on badly
+positioned labels and must not be used as promotion evidence.

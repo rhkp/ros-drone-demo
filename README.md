@@ -32,7 +32,8 @@ flowchart TD
 ```
 
 The important boundary is that simulator truth creates labels and supports
-offline comparison; the deployed detector predicts from camera images only.
+offline comparison; the deployed detector and mission observer use camera
+predictions at runtime.
 
 ## Prerequisites
 

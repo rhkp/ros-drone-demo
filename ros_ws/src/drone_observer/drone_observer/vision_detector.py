@@ -1,9 +1,9 @@
 """Camera-only Faster R-CNN detector for live perception.
 
 This node deliberately subscribes only to the camera image topic and publishes
-predictions to a separate topic. It cannot change the existing mission
-behavior, and it runs the trained PyTorch checkpoint directly on the GPU when
-one is available.
+predictions to a separate topic consumed by the mission observer and the ML
+pipeline. It runs the trained PyTorch checkpoint directly on the GPU when one
+is available.
 """
 
 import os
@@ -32,7 +32,7 @@ class VisionDetector(Node):
         ).value
         self.class_names = [item.strip() for item in str(class_names).split(',') if item.strip()]
         self.model_version = str(self.declare_parameter(
-            'model_version', os.environ.get('DRONE_MODEL_VERSION', 'v6')
+            'model_version', os.environ.get('DRONE_MODEL_VERSION', 'v7')
         ).value)
         self.confidence_threshold = float(self.declare_parameter(
             'confidence_threshold', float(os.environ.get('DRONE_CONFIDENCE_THRESHOLD', '0.35'))

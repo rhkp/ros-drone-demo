@@ -125,8 +125,9 @@ helm upgrade farm-drone-ml-data ./helm/drone-ml-pipeline \
 
 It subscribes only to `/drone/camera/image_raw` and publishes predictions,
 bounding boxes, confidence, and latency to `/drone/camera_detections`; it does
-not subscribe to `/drone/target_truth` and does not replace the existing
-mission detections.
+not subscribe to `/drone/target_truth`. The farm observer consumes this topic
+during `INSPECT`, so runtime mission detections come from the camera model.
+Simulator truth remains an offline labeling and scoring source only.
 
 ## Perception validation
 

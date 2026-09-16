@@ -1,5 +1,4 @@
 import json
-import math
 import os
 import threading
 import time
@@ -8,7 +7,7 @@ from pathlib import Path
 import rclpy
 import yaml
 from drone_observer_msgs.action import SurveyMission
-from drone_observer_msgs.msg import TargetDetection, TargetDetectionArray, TargetTruthArray
+from drone_observer_msgs.msg import TargetDetection, TargetDetectionArray
 from geometry_msgs.msg import PoseArray, PoseStamped
 from nav_msgs.msg import Odometry
 from nav_msgs.msg import Path as NavPath
@@ -67,7 +66,21 @@ class ObserverNode(Node):
         self.landing_altitude = self.declare_parameter(
             'landing_altitude', float(os.environ.get('DRONE_LANDING_ALTITUDE', '0.6'))
         ).value
-        self.truth = {}
+        self.camera_detection_topic = str(self.declare_parameter(
+            'camera_detection_topic',
+            os.environ.get('DRONE_DETECTION_TOPIC', '/drone/camera_detections'),
+        ).value)
+        self.camera_observation_window_sec = float(self.declare_parameter(
+            'camera_observation_window_sec',
+            float(os.environ.get('DRONE_CAMERA_OBSERVATION_WINDOW_SEC', '2.0')),
+        ).value)
+        self.camera_confidence_threshold = float(self.declare_parameter(
+            'camera_confidence_threshold',
+            float(os.environ.get('DRONE_MISSION_CONFIDENCE_THRESHOLD', '0.35')),
+        ).value)
+        self._latest_camera_detections = None
+        self._camera_detection_sequence = 0
+        self._camera_detection_condition = threading.Condition()
         self.latest_image = None
         self._last_pose = None
         self._mission_lock = threading.Lock()
@@ -80,7 +93,13 @@ class ObserverNode(Node):
         self.path_pub = self.create_publisher(NavPath, '/drone/mission_path', path_qos)
         self.detection_pub = self.create_publisher(TargetDetectionArray, '/drone/detections', 10)
         self.state_pub = self.create_publisher(String, '/drone/mission_state', 10)
-        self.create_subscription(TargetTruthArray, '/drone/target_truth', self.on_truth, 10, callback_group=self.callback_group)
+        self.create_subscription(
+            TargetDetectionArray,
+            self.camera_detection_topic,
+            self.on_camera_detections,
+            10,
+            callback_group=self.callback_group,
+        )
         self.create_subscription(Image, '/drone/camera/image_raw', self.on_image, 10, callback_group=self.callback_group)
         self.create_subscription(Odometry, '/drone/odom', self.on_odom, 10, callback_group=self.callback_group)
         if self.dynamic_obstacles_enabled:
@@ -92,7 +111,10 @@ class ObserverNode(Node):
         self.server = ActionServer(self, SurveyMission, '/drone/survey', self.execute,
                                    goal_callback=self.accept_goal, cancel_callback=self.accept_cancel,
                                    callback_group=self.callback_group)
-        self.get_logger().info(f'Farm observer ready; default scenario: {self.default_scenario}')
+        self.get_logger().info(
+            f'Farm observer ready; default scenario: {self.default_scenario}; '
+            f'camera perception topic: {self.camera_detection_topic}'
+        )
 
     def accept_goal(self, goal_request):
         scenario = goal_request.scenario or self.default_scenario
@@ -110,8 +132,11 @@ class ObserverNode(Node):
         self.get_logger().info('Accepting mission cancellation request')
         return CancelResponse.ACCEPT
 
-    def on_truth(self, message):
-        self.truth = {target.id: target for target in message.targets}
+    def on_camera_detections(self, message):
+        with self._camera_detection_condition:
+            self._latest_camera_detections = message
+            self._camera_detection_sequence += 1
+            self._camera_detection_condition.notify_all()
 
     def on_image(self, message):
         self.latest_image = message
@@ -182,6 +207,7 @@ class ObserverNode(Node):
         route = []
         planned_route = []
         detections = []
+        perception_observations = []
         self._state_history = []
         self.navigator.reset_replan_events()
         try:
@@ -203,30 +229,52 @@ class ObserverNode(Node):
                     progress_start=(index + 1) / segment_count,
                     progress_end=(index + 2) / segment_count,
                 )
-                visible = self._targets_near(x, y, allowed_types)
-                if not visible:
-                    self._set_state('INSPECT', goal_handle, len(detections))
-                for target in visible:
-                    self._set_state('INSPECT', goal_handle, len(detections), target.id)
-                    evidence = self._capture(mission_id, target.id)
+                self._set_state('INSPECT', goal_handle, len(detections))
+                predictions, observation = self._observe_camera(allowed_types)
+                observation['waypoint_index'] = index + 1
+                observation['waypoint'] = {'x': x, 'y': y, 'z': z}
+                perception_observations.append(observation)
+                for prediction in predictions:
+                    self._set_state('INSPECT', goal_handle, len(detections), prediction.target_type)
+                    evidence = self._capture(
+                        mission_id,
+                        f'waypoint-{index + 1}-{prediction.target_type}',
+                    )
                     detection = TargetDetection()
-                    detection.header.stamp = self.get_clock().now().to_msg()
+                    detection.header.stamp = prediction.header.stamp
                     detection.header.frame_id = 'farm_map'
-                    detection.mission_id, detection.target_id = mission_id, target.id
-                    detection.target_type = target.target_type
-                    detection.confidence = 0.98
-                    detection.pose = target.pose
+                    detection.mission_id = mission_id
+                    detection.target_id = prediction.target_id or f'camera-detection-{len(detections) + 1:04d}'
+                    detection.target_type = prediction.target_type
+                    detection.confidence = prediction.confidence
+                    detection.pose.position.x = x
+                    detection.pose.position.y = y
+                    detection.pose.position.z = z
+                    detection.pose.orientation.w = 1.0
                     detection.image_path = str(evidence)
+                    detection.bbox_x_min = prediction.bbox_x_min
+                    detection.bbox_y_min = prediction.bbox_y_min
+                    detection.bbox_x_max = prediction.bbox_x_max
+                    detection.bbox_y_max = prediction.bbox_y_max
+                    detection.model_version = prediction.model_version or observation['model_version']
                     detections.append(detection)
                 self._publish_detections(detections)
 
             self._return_and_land(goal_handle, len(detections), route)
             self._set_state('COMPLETE', goal_handle, len(detections))
-            report = self._write_report(mission_id, scenario_name, detections, True, 'Mission completed', planned_route)
+            detected_types = {item.target_type for item in detections}
+            missed_types = sorted(allowed_types - detected_types)
+            mission_message = 'Mission completed'
+            if missed_types:
+                mission_message += '; camera perception missed: ' + ', '.join(missed_types)
+            report = self._write_report(
+                mission_id, scenario_name, detections, True, mission_message,
+                planned_route, allowed_types, perception_observations,
+            )
             goal_handle.succeed()
             result = SurveyMission.Result()
             result.success, result.detections, result.report_path = True, len(detections), str(report)
-            result.message = f'Farm survey complete: {scenario_name}'
+            result.message = f'Farm survey complete: {scenario_name}; {mission_message}'
             return result
         except MissionCanceled:
             self._set_state('EMERGENCY', goal_handle, len(detections))
@@ -234,6 +282,7 @@ class ObserverNode(Node):
             report = self._write_report(
                 mission_id, scenario_name, detections, False,
                 'Mission canceled; returned home', planned_route,
+                allowed_types, perception_observations,
             )
             goal_handle.canceled()
             result = SurveyMission.Result()
@@ -244,7 +293,10 @@ class ObserverNode(Node):
             self.get_logger().error(f'Mission failed: {error}')
             self._set_state('EMERGENCY', goal_handle, len(detections))
             self._attempt_return_and_land()
-            report = self._write_report(mission_id, scenario_name, detections, False, str(error), planned_route)
+            report = self._write_report(
+                mission_id, scenario_name, detections, False, str(error), planned_route,
+                allowed_types, perception_observations,
+            )
             goal_handle.abort()
             result = SurveyMission.Result()
             result.success, result.detections, result.report_path = False, len(detections), str(report)
@@ -319,9 +371,54 @@ class ObserverNode(Node):
         message.data = max(0.0, min(1.0, float(value)))
         self.navigation_progress_pub.publish(message)
 
-    def _targets_near(self, x, y, allowed_types):
-        return [target for target in self.truth.values()
-                if target.target_type in allowed_types and math.hypot(target.pose.position.x - x, target.pose.position.y - y) < 8.0]
+    def _observe_camera(self, allowed_types):
+        """Collect fresh camera predictions for one inspection waypoint."""
+        deadline = time.monotonic() + self.camera_observation_window_sec
+        with self._camera_detection_condition:
+            sequence = self._camera_detection_sequence
+            best_by_type = {}
+            model_versions = set()
+            latencies = []
+            inference_errors = []
+            message_count = 0
+            prediction_count = 0
+            while time.monotonic() < deadline:
+                remaining = deadline - time.monotonic()
+                while self._camera_detection_sequence <= sequence and remaining > 0:
+                    self._camera_detection_condition.wait(timeout=min(remaining, 0.25))
+                    remaining = deadline - time.monotonic()
+                if self._camera_detection_sequence <= sequence:
+                    continue
+                sequence = self._camera_detection_sequence
+                message = self._latest_camera_detections
+                if message is None:
+                    continue
+                message_count += 1
+                if message.model_version:
+                    model_versions.add(message.model_version)
+                latencies.append(float(message.inference_latency_ms))
+                if not message.inference_ok:
+                    inference_errors.append(message.inference_error or 'camera inference failed')
+                for prediction in message.detections:
+                    if prediction.target_type not in allowed_types:
+                        continue
+                    if prediction.confidence < self.camera_confidence_threshold:
+                        continue
+                    prediction_count += 1
+                    current = best_by_type.get(prediction.target_type)
+                    if current is None or prediction.confidence > current.confidence:
+                        best_by_type[prediction.target_type] = prediction
+                    if prediction.model_version:
+                        model_versions.add(prediction.model_version)
+        return list(best_by_type.values()), {
+            'source_topic': self.camera_detection_topic,
+            'model_version': ','.join(sorted(model_versions)),
+            'message_count': message_count,
+            'prediction_count': prediction_count,
+            'inference_errors': inference_errors,
+            'inference_latency_ms': latencies,
+            'detected_types': sorted(best_by_type),
+        }
 
     def _capture(self, mission_id, target_id):
         path = self.artifact_dir / mission_id / f'{target_id}.png'
@@ -343,9 +440,15 @@ class ObserverNode(Node):
         message.detections = detections
         self.detection_pub.publish(message)
 
-    def _write_report(self, mission_id, scenario_name, detections, success, message, route):
+    def _write_report(
+        self, mission_id, scenario_name, detections, success, message, route,
+        expected_types=(), perception_observations=(),
+    ):
         path = self.artifact_dir / mission_id / 'report.json'
         path.parent.mkdir(parents=True, exist_ok=True)
+        expected_types = set(expected_types)
+        detected_types = {item.target_type for item in detections}
+        model_versions = sorted({item.model_version for item in detections if item.model_version})
         report = {
             'mission_id': mission_id,
             'scenario': scenario_name,
@@ -356,9 +459,24 @@ class ObserverNode(Node):
             ],
             'replan_events': list(self.navigator.replan_events),
             'state_history': self._state_history,
+            'perception': {
+                'mode': 'camera',
+                'source_topic': self.camera_detection_topic,
+                'confidence_threshold': self.camera_confidence_threshold,
+                'expected_target_types': sorted(expected_types),
+                'detected_target_types': sorted(detected_types),
+                'missed_target_types': sorted(expected_types - detected_types),
+                'model_versions': model_versions,
+                'observations': perception_observations,
+            },
             'detections': [
                 {'target_id': item.target_id, 'target_type': item.target_type,
-                 'confidence': item.confidence, 'image_path': item.image_path}
+                 'confidence': item.confidence, 'image_path': item.image_path,
+                 'model_version': item.model_version,
+                 'bbox_pixels': {
+                     'x_min': item.bbox_x_min, 'y_min': item.bbox_y_min,
+                     'x_max': item.bbox_x_max, 'y_max': item.bbox_y_max,
+                 }}
                 for item in detections
             ],
         }

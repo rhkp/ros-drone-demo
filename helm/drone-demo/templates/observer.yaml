@@ -35,6 +35,12 @@ spec:
               value: "12.0"
             - name: DRONE_LANDING_ALTITUDE
               value: "0.6"
+            - name: DRONE_DETECTION_TOPIC
+              value: {{ default "/drone/camera_detections" ((.Values.perception | default dict).detectionTopic) | quote }}
+            - name: DRONE_CAMERA_OBSERVATION_WINDOW_SEC
+              value: {{ default "2.0" ((.Values.perception | default dict).observationWindowSec) | quote }}
+            - name: DRONE_MISSION_CONFIDENCE_THRESHOLD
+              value: {{ default "0.35" ((.Values.perception | default dict).confidenceThreshold) | quote }}
             - name: RMW_IMPLEMENTATION
               value: rmw_zenoh_cpp
             - name: ZENOH_ROUTER_ENDPOINT

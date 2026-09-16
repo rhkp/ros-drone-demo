@@ -258,7 +258,10 @@ show both kinds of boxes for frames where the model produced a prediction:
 
 This visual comparison is the primary validation/demo output. The optional
 perception validator can additionally calculate IoU-based precision and recall,
-but it is not required to inspect or demonstrate the captured predictions.
+but it is not required to inspect or demonstrate the captured predictions. The
+observer also consumes `/drone/camera_detections` during `INSPECT`; missed model
+classes are recorded in the mission report while the drone still returns and
+lands safely.
 
 ## Safe reinstall and data preservation
 
