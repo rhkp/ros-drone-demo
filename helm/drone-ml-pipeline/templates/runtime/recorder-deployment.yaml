@@ -52,7 +52,7 @@ spec:
             - name: RMW_IMPLEMENTATION
               value: rmw_zenoh_cpp
             - name: ZENOH_ROUTER_ENDPOINT
-              value: {{ default "tcp/farm-drone-ros-drone-demo-zenoh.arhkp1-farm-drone.svc.cluster.local:7447" $recorder.zenohEndpoint | quote }}
+              value: {{ default (include "farm-drone-ml-data.zenohEndpoint" .) $recorder.zenohEndpoint | quote }}
             - name: DRONE_SCENARIO
               value: {{ default "all" $recorder.scenario | quote }}
             - name: DRONE_DATASET_SEED

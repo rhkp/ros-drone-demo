@@ -9,9 +9,9 @@ must live in this independent namespace and PVC instead.
 Install it with:
 
 ```bash
-helm upgrade --install farm-drone-ml-data ./helm-ml \
+helm upgrade --install farm-drone-ml-data ./helm/drone-ml-pipeline \
   --namespace arhkp1-farm-drone-ml --create-namespace \
-  --values ./helm-ml/values.yaml.example --wait
+  --values ./helm/drone-ml-pipeline/values.yaml.example --wait
 ```
 
 After the PVC binds, set its backing PV reclaim policy to `Retain`:
@@ -69,9 +69,9 @@ contains the `dataset_recorder` executable. After building and publishing that
 image, enable it with an override such as:
 
 ```bash
-helm upgrade --install farm-drone-ml-data ./helm-ml \
+helm upgrade --install farm-drone-ml-data ./helm/drone-ml-pipeline \
   --namespace arhkp1-farm-drone-ml \
-  --values ./helm-ml/values.yaml.example \
+  --values ./helm/drone-ml-pipeline/values.yaml.example \
   --set recorder.enabled=true \
   --set recorder.image=quay.io/rhkp/hbr-drone-observer:v0.6.9 \
   --wait
@@ -112,7 +112,7 @@ The detector Deployment runs the camera-only ROS node using the trained Faster
 R-CNN checkpoint:
 
 ```bash
-helm upgrade farm-drone-ml-data ./helm-ml \
+helm upgrade farm-drone-ml-data ./helm/drone-ml-pipeline \
   --namespace arhkp1-farm-drone-ml --reuse-values \
   --set detector.enabled=true --wait
 ```
@@ -127,7 +127,7 @@ mission detections.
 Run the validator for a bounded mission window after enabling the detector:
 
 ```bash
-helm upgrade farm-drone-ml-data ./helm-ml \
+helm upgrade farm-drone-ml-data ./helm/drone-ml-pipeline \
   --namespace arhkp1-farm-drone-ml --reuse-values \
   --set perceptionValidator.enabled=true --wait
 ```

@@ -2,7 +2,8 @@
 .env
 *.pem
 *.key
-helm/values.yaml
+helm/drone-demo/values.yaml
+helm/drone-ml-pipeline/values.yaml
 artifacts
 build
 install

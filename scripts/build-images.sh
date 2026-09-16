@@ -23,7 +23,7 @@ build_one() {
     build_args+=(--build-arg "BOOTC_OS_IMAGE=${BOOTC_OS_IMAGE}")
   fi
   "${engine}" build "${build_args[@]}" \
-    --file "${repo_dir}/images/drone-${name}/Containerfile" \
+    --file "${repo_dir}/components/drone-${name}/Containerfile" \
     --tag "${tag}" "${repo_dir}"
   echo "Built ${tag}"
 }

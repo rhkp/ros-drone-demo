@@ -53,7 +53,7 @@ spec:
             - name: RMW_IMPLEMENTATION
               value: rmw_zenoh_cpp
             - name: ZENOH_ROUTER_ENDPOINT
-              value: {{ default "tcp/farm-drone-ros-drone-demo-zenoh.arhkp1-farm-drone.svc.cluster.local:7447" $validator.zenohEndpoint | quote }}
+              value: {{ default (include "farm-drone-ml-data.zenohEndpoint" .) $validator.zenohEndpoint | quote }}
             - name: DRONE_VALIDATOR_DURATION_SEC
               value: {{ default "240" $validator.durationSec | quote }}
             - name: DRONE_VALIDATOR_IOU_THRESHOLD

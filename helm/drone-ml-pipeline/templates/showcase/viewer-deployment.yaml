@@ -16,7 +16,7 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/viewer-script: {{ .Files.Get "viewer/server.py" | sha256sum }}
+        checksum/viewer-script: {{ .Files.Get "showcase/server.py" | sha256sum }}
       labels:
         app.kubernetes.io/name: {{ include "farm-drone-ml-data.name" . }}-viewer
         app.kubernetes.io/instance: {{ .Release.Name }}
@@ -30,6 +30,18 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      # The ML PVC is RWO. Follow the storage anchor so every consumer mounts
+      # the volume on one node even when the cluster has multiple GPU nodes.
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/name
+                    operator: In
+                    values:
+                      - {{ include "farm-drone-ml-data.name" . }}-storage-anchor
+              topologyKey: kubernetes.io/hostname
       containers:
         - name: viewer
           image: {{ default "registry.access.redhat.com/ubi9/python-311:latest" $viewer.image | quote }}

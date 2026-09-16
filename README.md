@@ -19,8 +19,11 @@ The five core detection types are `well`, `storage_silo`, `cattle_shed`, `produc
 - `ros_ws/src/drone_observer_msgs/` — reusable truth, detection, and survey action interfaces.
 - `ros_ws/src/drone_observer/` — waypoint controller, rendered-camera subscriber, truth publisher, and observer action server.
 - `scripts/launch-world.sh` — Gazebo startup plus ROS-Gazebo image and pose bridges.
-- `images/` — separate world and observer image definitions.
-- `helm/` — OpenShift/Kubernetes deployment with Zenoh connectivity and evidence PVC.
+- `components/simulation-world/` — Gazebo farm world image definition.
+- `components/drone-observer/` — ROS observer image definition.
+- `drone-ml-pipeline/` — ML pipeline overview and roadmap.
+- `helm/drone-demo/` — OpenShift/Kubernetes deployment for the farm demo.
+- `helm/drone-ml-pipeline/` — persistent ML data, training, labeling, validation, and showcase chart.
 
 ## Local run
 
@@ -84,7 +87,7 @@ The world image contains only the farm world and Gazebo runtime additions. The o
 
 ```bash
 helm upgrade --install ros-drone-demo ./helm \
-  -f ./helm/values.yaml \
+  -f ./helm/drone-demo/values.yaml \
   --namespace ros-drone-demo --create-namespace --wait
 ```
 
@@ -105,4 +108,7 @@ POD=$(oc get pod -n ros-drone-demo \
 oc cp -n ros-drone-demo "$POD:/artifacts/<mission-id>" ./artifacts/<mission-id>
 ```
 
-Copy `helm/values.yaml.example` to a local, ignored `helm/values.yaml` before deployment. Never commit that copy, `.env`, cloud credentials, registry credentials, private keys, or other sensitive files. The committed example files contain only public placeholder configuration.
+Copy `helm/drone-demo/values.yaml.example` to a local, ignored
+`helm/drone-demo/values.yaml` before deployment. Never commit that copy, `.env`,
+cloud credentials, registry credentials, private keys, or other sensitive files.
+The committed example files contain only public placeholder configuration.

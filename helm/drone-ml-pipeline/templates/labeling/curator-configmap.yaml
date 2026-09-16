@@ -9,5 +9,5 @@ metadata:
     app.kubernetes.io/component: dataset-curator
 data:
   assemble_dataset.py: |-
-{{ .Files.Get "curator/assemble_dataset.py" | indent 4 }}
+{{ .Files.Get "labeling/assemble_dataset.py" | indent 4 }}
 {{- end }}

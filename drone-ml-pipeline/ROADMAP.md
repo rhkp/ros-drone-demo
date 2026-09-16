@@ -325,7 +325,8 @@ The first implementation should be limited to Phase 0 and the beginning of Phase
 This is the fastest way to validate that the rendered camera view and projected
 labels are useful before spending time on model training.
 
-The recorder implementation now exists as an opt-in workload in `helm-ml`. It
+The recorder implementation now exists as an opt-in workload in
+`helm/drone-ml-pipeline`. It
 writes image files plus YOLO and JSON labels to versioned `flight-*` directories,
 and the ML showcase viewer exposes them. The v6 capture and corrected curation
 are complete. The previous v3/v4 model metrics were based on badly positioned

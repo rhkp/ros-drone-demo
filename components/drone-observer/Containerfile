@@ -20,7 +20,7 @@ COPY --from=build /opt/micromamba /opt/micromamba
 COPY config/scenarios.yaml /opt/drone-demo/config/scenarios.yaml
 COPY config/nav2_params.yaml /opt/drone-demo/config/nav2_params.yaml
 COPY scripts/launch-observer.sh /opt/drone-demo/scripts/launch-observer.sh
-COPY images/drone-observer/ros-env.sh /opt/drone/scripts/ros-env.sh
+COPY components/drone-observer/ros-env.sh /opt/drone/scripts/ros-env.sh
 RUN chmod 0755 /opt/drone-demo/scripts/launch-observer.sh /opt/drone/scripts/ros-env.sh && \
     chown -R 1001:0 /opt/drone_ws /opt/drone-demo /opt/drone /artifacts && \
     chmod -R g=u /opt/drone_ws /opt/drone-demo /opt/drone /artifacts

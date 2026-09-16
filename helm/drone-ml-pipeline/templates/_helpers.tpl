@@ -23,3 +23,8 @@ app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 app.kubernetes.io/component: perception-data
 {{- end }}
+
+{{- define "farm-drone-ml-data.zenohEndpoint" -}}
+{{- $demo := .Values.demo | default dict -}}
+{{- printf "tcp/%s.%s.svc.cluster.local:7447" (default "farm-drone-ros-drone-demo-zenoh" $demo.zenohService) (default "farm-drone" $demo.namespace) -}}
+{{- end }}

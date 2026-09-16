@@ -9,5 +9,5 @@ metadata:
     app.kubernetes.io/component: model-trainer
 data:
   train_detector.py: |-
-{{ .Files.Get "trainer/train_detector.py" | indent 4 }}
+{{ .Files.Get "training/train_detector.py" | indent 4 }}
 {{- end }}

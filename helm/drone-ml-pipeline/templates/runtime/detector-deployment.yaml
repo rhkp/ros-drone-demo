@@ -60,7 +60,7 @@ spec:
             - name: RMW_IMPLEMENTATION
               value: rmw_zenoh_cpp
             - name: ZENOH_ROUTER_ENDPOINT
-              value: {{ default "tcp/farm-drone-ros-drone-demo-zenoh.arhkp1-farm-drone.svc.cluster.local:7447" $detector.zenohEndpoint | quote }}
+              value: {{ default (include "farm-drone-ml-data.zenohEndpoint" .) $detector.zenohEndpoint | quote }}
             - name: DRONE_MODEL_PATH
               value: {{ default "/data/perception/models/v7/detector.pt" $detector.modelPath | quote }}
             - name: DRONE_MODEL_VERSION

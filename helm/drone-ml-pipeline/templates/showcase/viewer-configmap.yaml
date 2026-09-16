@@ -9,5 +9,5 @@ metadata:
     app.kubernetes.io/component: perception-showcase
 data:
   server.py: |-
-{{ .Files.Get "viewer/server.py" | indent 4 }}
+{{ .Files.Get "showcase/server.py" | indent 4 }}
 {{- end }}

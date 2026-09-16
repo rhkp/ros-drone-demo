@@ -4,6 +4,12 @@ storage:
 
 dataPath: /data/perception
 
+# The demo chart's release name and namespace. Override these two values if the
+# farm demo is installed under different names in another cluster.
+demo:
+  namespace: farm-drone
+  zenohService: farm-drone-ros-drone-demo-zenoh
+
 # Keep all RWO PVC consumers on the GPU node when running the PyTorch detector.
 placement:
   nodeSelector:
@@ -57,7 +63,6 @@ recorder:
   captureIntervalSec: 0.5
   maxFrames: 0
   scenarioFile: /opt/drone-demo/config/scenarios.yaml
-  zenohEndpoint: tcp/farm-drone-ros-drone-demo-zenoh.arhkp1-farm-drone.svc.cluster.local:7447
 
 # One-shot raw-flight curation. It writes a new dataset and never deletes raw data.
 curator:

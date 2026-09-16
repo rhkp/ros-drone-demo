@@ -4,6 +4,9 @@ metadata:
   name: {{ include "ros-drone-demo.fullname" . }}-artifacts
   labels:
     {{- include "ros-drone-demo.labels" . | nindent 4 }}
+  annotations:
+    # Keep mission evidence when the demo release is uninstalled and recreated.
+    helm.sh/resource-policy: keep
 spec:
   accessModes: [ReadWriteOnce]
   resources:
