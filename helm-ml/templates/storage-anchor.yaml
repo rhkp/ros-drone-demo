@@ -18,6 +18,14 @@ spec:
         app.kubernetes.io/name: {{ include "farm-drone-ml-data.name" . }}-storage-anchor
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
+      {{- with ((.Values.placement | default dict).nodeSelector) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with ((.Values.placement | default dict).tolerations) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: storage-anchor
           image: {{ default "registry.access.redhat.com/ubi9/ubi-minimal:9.5" $anchor.image | quote }}

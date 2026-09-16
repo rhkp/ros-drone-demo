@@ -1,25 +1,33 @@
-{{- $evaluator := .Values.shadowEvaluator | default dict }}
-{{- if (default false $evaluator.enabled) }}
+{{- $validator := .Values.perceptionValidator | default dict }}
+{{- if (default false $validator.enabled) }}
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "farm-drone-ml-data.fullname" . }}-shadow-evaluator
+  name: {{ include "farm-drone-ml-data.fullname" . }}-perception-validator
   labels:
     {{- include "farm-drone-ml-data.labels" . | nindent 4 }}
-    app.kubernetes.io/component: shadow-evaluator
+    app.kubernetes.io/component: perception-validator
 spec:
   backoffLimit: 0
   ttlSecondsAfterFinished: 86400
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: {{ include "farm-drone-ml-data.name" . }}-shadow-evaluator
+        app.kubernetes.io/name: {{ include "farm-drone-ml-data.name" . }}-perception-validator
         app.kubernetes.io/instance: {{ .Release.Name }}
-        app.kubernetes.io/component: shadow-evaluator
+        app.kubernetes.io/component: perception-validator
     spec:
       restartPolicy: Never
       securityContext:
         runAsNonRoot: true
+      {{- with ((.Values.placement | default dict).nodeSelector) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with ((.Values.placement | default dict).tolerations) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       affinity:
         podAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -32,28 +40,28 @@ spec:
                       - {{ include "farm-drone-ml-data.name" . }}-storage-anchor
               topologyKey: kubernetes.io/hostname
       containers:
-        - name: shadow-evaluator
-          image: {{ default "quay.io/rhkp/hbr-drone-observer:v0.8.0" $evaluator.image | quote }}
+        - name: perception-validator
+          image: {{ default "quay.io/rhkp/hbr-drone-observer:v1.2.0" $validator.image | quote }}
           imagePullPolicy: IfNotPresent
           command: ["/bin/bash", "-lc"]
           args:
             - >-
               source /opt/drone/scripts/ros-env.sh &&
               source /opt/drone_ws/install/setup.bash &&
-              exec ros2 run drone_observer shadow_evaluator
+              exec ros2 run drone_observer perception_validator
           env:
             - name: RMW_IMPLEMENTATION
               value: rmw_zenoh_cpp
             - name: ZENOH_ROUTER_ENDPOINT
-              value: {{ default "tcp/farm-drone-ros-drone-demo-zenoh.arhkp1-farm-drone.svc.cluster.local:7447" $evaluator.zenohEndpoint | quote }}
-            - name: DRONE_SHADOW_DURATION_SEC
-              value: {{ default "240" $evaluator.durationSec | quote }}
-            - name: DRONE_SHADOW_IOU_THRESHOLD
-              value: {{ default "0.5" $evaluator.iouThreshold | quote }}
-            - name: DRONE_SHADOW_MODEL_VERSION
-              value: {{ default "v6" $evaluator.modelVersion | quote }}
-            - name: DRONE_SHADOW_REPORT
-              value: {{ default "/data/perception/evaluations/shadow-v6/report.json" $evaluator.outputPath | quote }}
+              value: {{ default "tcp/farm-drone-ros-drone-demo-zenoh.arhkp1-farm-drone.svc.cluster.local:7447" $validator.zenohEndpoint | quote }}
+            - name: DRONE_VALIDATOR_DURATION_SEC
+              value: {{ default "240" $validator.durationSec | quote }}
+            - name: DRONE_VALIDATOR_IOU_THRESHOLD
+              value: {{ default "0.5" $validator.iouThreshold | quote }}
+            - name: DRONE_VALIDATOR_MODEL_VERSION
+              value: {{ default "v7" $validator.modelVersion | quote }}
+            - name: DRONE_VALIDATOR_REPORT
+              value: {{ default "/data/perception/evaluations/perception-v7/report.json" $validator.outputPath | quote }}
             - name: DRONE_SCENARIO_FILE
               value: /opt/drone-demo/config/scenarios.yaml
           resources:

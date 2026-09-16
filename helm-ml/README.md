@@ -58,7 +58,8 @@ oc port-forward -n arhkp1-farm-drone-ml \
 ```
 
 Then open `http://127.0.0.1:8080`. The viewer starts with an empty state and
-will automatically show artifacts as the recorder, training Job, and evaluator
+will automatically show artifacts as the recorder, training Job, and perception
+validator
 write versioned content under `datasets/`, `models/`, and `evaluations/`.
 
 ## Dataset recorder
@@ -102,33 +103,18 @@ validation metrics under `evaluations/v6/`.
 It uses one NVIDIA GPU and does not use `/drone/target_truth` at runtime.
 
 Because the PVC is ReadWriteOnce, disable the viewer and storage anchor while
-the trainer runs, then enable them again after the Job completes. The first
-checkpoint is intentionally a PyTorch artifact; ONNX export and camera-only
-runtime integration are subsequent gates after the metrics are inspected.
+the trainer runs, then enable them again after the Job completes. The promoted
+artifact is the PyTorch checkpoint itself and runs directly with CUDA.
 
-## ONNX export and shadow detector
+## Camera detector
 
-The exporter converts the versioned PyTorch checkpoint without touching raw
-images or labels. Because the PVC is ReadWriteOnce, pause the viewer and anchor
-while it runs:
+The detector Deployment runs the camera-only ROS node using the trained Faster
+R-CNN checkpoint:
 
 ```bash
 helm upgrade farm-drone-ml-data ./helm-ml \
   --namespace arhkp1-farm-drone-ml --reuse-values \
-  --set viewer.enabled=false --set anchor.enabled=false \
-  --set exporter.enabled=true --wait
-```
-
-After the Job completes, restore the viewer and anchor and set
-`exporter.enabled=false`. The resulting artifact is
-`models/v6/detector.onnx`.
-
-The optional detector Deployment runs the camera-only ROS node in shadow mode:
-
-```bash
-helm upgrade farm-drone-ml-data ./helm-ml \
-  --namespace arhkp1-farm-drone-ml --reuse-values \
-  --set detector.enabled=true --set exporter.enabled=false --wait
+  --set detector.enabled=true --wait
 ```
 
 It subscribes only to `/drone/camera/image_raw` and publishes predictions,
@@ -136,17 +122,22 @@ bounding boxes, confidence, and latency to `/drone/camera_detections`; it does
 not subscribe to `/drone/target_truth` and does not replace the existing
 mission detections.
 
-## Shadow evaluation
+## Perception validation
 
-Run the evaluator for a bounded mission window after enabling the detector:
+Run the validator for a bounded mission window after enabling the detector:
 
 ```bash
 helm upgrade farm-drone-ml-data ./helm-ml \
   --namespace arhkp1-farm-drone-ml --reuse-values \
-  --set shadowEvaluator.enabled=true --wait
+  --set perceptionValidator.enabled=true --wait
 ```
 
-Submit the desired mission during that window, then disable the evaluator after
-the Job completes. The evaluator uses truth only offline to calculate IoU-based
-precision and recall and writes `evaluations/shadow-v6/report.json`. It never
-publishes to the live mission detection topic.
+Submit the desired mission during that window, then disable the validator after
+the Job completes. The validator uses truth only offline to calculate IoU-based
+precision and recall and writes
+`evaluations/perception-v7/report.json`. It never publishes to the live mission
+detection topic.
+
+The previous ONNX exporter and ONNX-specific templates are retained under
+`archived/onnx/` for historical reference and are not part of the active Helm
+workflow.

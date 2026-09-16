@@ -9,6 +9,11 @@ metadata:
     app.kubernetes.io/component: camera-detector
 spec:
   replicas: 1
+  # The detector reserves the cluster's single GPU; release the old pod before
+  # starting a new image so upgrades do not deadlock in Pending.
+  strategy:
+    type: Recreate
+    rollingUpdate: null
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ include "farm-drone-ml-data.name" . }}-detector
@@ -22,6 +27,14 @@ spec:
     spec:
       securityContext:
         runAsNonRoot: true
+      {{- with ((.Values.placement | default dict).nodeSelector) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with ((.Values.placement | default dict).tolerations) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       affinity:
         podAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -35,7 +48,7 @@ spec:
               topologyKey: kubernetes.io/hostname
       containers:
         - name: detector
-          image: {{ default "quay.io/rhkp/hbr-drone-observer:v0.7.0" $detector.image | quote }}
+          image: {{ default "quay.io/rhkp/hbr-drone-observer:v0.9.0" $detector.image | quote }}
           imagePullPolicy: IfNotPresent
           command: ["/bin/bash", "-lc"]
           args:
@@ -49,9 +62,9 @@ spec:
             - name: ZENOH_ROUTER_ENDPOINT
               value: {{ default "tcp/farm-drone-ros-drone-demo-zenoh.arhkp1-farm-drone.svc.cluster.local:7447" $detector.zenohEndpoint | quote }}
             - name: DRONE_MODEL_PATH
-              value: {{ default "/data/perception/models/v6/detector.onnx" $detector.modelPath | quote }}
+              value: {{ default "/data/perception/models/v7/detector.pt" $detector.modelPath | quote }}
             - name: DRONE_MODEL_VERSION
-              value: {{ default "v6" $detector.modelVersion | quote }}
+              value: {{ default "v7" $detector.modelVersion | quote }}
             - name: DRONE_CLASS_NAMES
               value: {{ default "well,storage_silo,cattle_shed,produce_barn,crop_field,greenhouse,water_tank" $detector.classNames | quote }}
             - name: DRONE_CONFIDENCE_THRESHOLD
@@ -60,11 +73,13 @@ spec:
               value: {{ default "/drone/camera_detections" $detector.outputTopic | quote }}
           resources:
             requests:
-              cpu: 250m
-              memory: 512Mi
+              cpu: {{ default "500m" $detector.cpuRequest | quote }}
+              memory: {{ default "2Gi" $detector.memoryRequest | quote }}
+              nvidia.com/gpu: {{ default "1" $detector.gpuRequest | quote }}
             limits:
-              cpu: "1"
-              memory: 1Gi
+              cpu: {{ default "2" $detector.cpuLimit | quote }}
+              memory: {{ default "4Gi" $detector.memoryLimit | quote }}
+              nvidia.com/gpu: {{ default "1" $detector.gpuLimit | quote }}
           volumeMounts:
             - name: perception-data
               mountPath: {{ default "/data/perception" .Values.dataPath | quote }}

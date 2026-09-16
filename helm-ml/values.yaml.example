@@ -4,6 +4,15 @@ storage:
 
 dataPath: /data/perception
 
+# Keep all RWO PVC consumers on the GPU node when running the PyTorch detector.
+placement:
+  nodeSelector:
+    nvidia.com/gpu.present: "true"
+  tolerations:
+    - key: g5-gpu
+      operator: Exists
+      effect: NoSchedule
+
 anchor:
   enabled: true
   image: registry.access.redhat.com/ubi9/ubi-minimal:9.5
@@ -17,26 +26,26 @@ viewer:
     enabled: true
     host: ""
 
-# Optional shadow-mode camera detector. It never subscribes to simulator truth
-# and publishes to a separate topic until the model passes promotion gates.
+# Optional camera detector. It never subscribes to simulator truth and publishes
+# predictions to a separate topic for the trained Faster R-CNN model.
 detector:
   enabled: false
-  image: quay.io/rhkp/hbr-drone-observer:v0.8.1
-  modelPath: /data/perception/models/v6/detector.onnx
-  modelVersion: v6
+  image: quay.io/rhkp/hbr-drone-observer:v1.2.0
+  modelPath: /data/perception/models/v7/detector.pt
+  modelVersion: v7
   classNames: well,storage_silo,cattle_shed,produce_barn,crop_field,greenhouse,water_tank
   confidenceThreshold: "0.35"
   outputTopic: /drone/camera_detections
 
-# One-shot offline scorer. It may read simulator truth only to score the
+# One-shot perception validator. It may read simulator truth only to score the
 # camera-only predictions; it never feeds truth into the detector.
-shadowEvaluator:
+perceptionValidator:
   enabled: false
-  image: quay.io/rhkp/hbr-drone-observer:v0.8.1
+  image: quay.io/rhkp/hbr-drone-observer:v1.2.0
   durationSec: "240"
   iouThreshold: "0.5"
-  modelVersion: v6
-  outputPath: /data/perception/evaluations/shadow-v6/report.json
+  modelVersion: v7
+  outputPath: /data/perception/evaluations/perception-v7/report.json
 
 # Enable only after publishing an observer image containing dataset_recorder.
 recorder:
@@ -75,20 +84,6 @@ trainer:
   epochs: 12
   batchSize: 4
   seed: "20260914"
-  nodeSelector:
-    nvidia.com/gpu.present: "true"
-  tolerations:
-    - key: g5-gpu
-      operator: Exists
-      effect: NoSchedule
-
-# One-shot PyTorch -> ONNX conversion. Disable viewer/anchor while it runs.
-exporter:
-  enabled: false
-  image: pytorch/pytorch:2.4.1-cuda12.1-cudnn9-runtime
-  modelDir: /data/perception/models/v6
-  checkpoint: /data/perception/models/v6/detector.pt
-  output: /data/perception/models/v6/detector.onnx
   nodeSelector:
     nvidia.com/gpu.present: "true"
   tolerations:

@@ -24,7 +24,7 @@ setup(
             'nav2_cmd_vel_adapter = drone_observer.nav2_cmd_vel_adapter:main',
             'dataset_recorder = drone_observer.dataset_recorder:main',
             'vision_detector = drone_observer.vision_detector:main',
-            'shadow_evaluator = drone_observer.shadow_evaluator:main',
+            'perception_validator = drone_observer.perception_validator:main',
         ],
     },
 )

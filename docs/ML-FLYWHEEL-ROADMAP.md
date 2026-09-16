@@ -13,34 +13,28 @@ On 2026-09-14, the fresh OpenShift deployment completed the `all` mission as
 `COMPLETE`. This is the baseline demo run to preserve before changing perception
 behavior.
 
-The corrected training loop is now operational as of 2026-09-15. Observer image
-`v0.6.9` captured `flight-v6` (209 images, 209 audit labels) on the targeted
-`inventory` route. `curated-v6` combines six raw episodes into 1,030 curated
-frames, with `flight-v5` held out for validation. The free PyTorch/torchvision
-baseline produced model v6 on CUDA with 78.1% macro precision, 86.3% macro
-recall, and 12.8 ms inference latency. It is not deployed into the live mission
-yet; the next gate is ONNX export plus a camera-only inference node and a repeat
-mission comparison.
+The corrected training loop is operational. The curated v7 dataset contains
+versioned images, labels, and sampled negatives from multiple flights, with
+held-out episodes kept separate for validation. The free PyTorch/torchvision
+baseline produced a Faster R-CNN v7 checkpoint and was validated offline.
 
-The ONNX exporter, isolated shadow detector, and offline IoU evaluator are now
-implemented and deployed as `v0.8.1` in the separate ML namespace. The shadow
-detector uses `/drone/camera/image_raw` only and publishes boxes, confidence,
-model version, and latency to `/drone/camera_detections`; it must not be
-confused with the existing truth-driven `/drone/detections` topic until the
-promotion gates pass. The evaluator may read `/drone/target_truth` only to
-score predictions and writes a separate shadow evaluation report.
+The active runtime is now the PyTorch checkpoint itself:
+`models/v7/detector.pt`. It is deployed in the independent ML namespace as a
+GPU-backed camera detector on an NVIDIA A10G. It subscribes only to
+`/drone/camera/image_raw` and publishes class, bounding box, confidence, model
+version, and latency to `/drone/camera_detections`.
 
-The first valid end-to-end shadow mission completed on 2026-09-15. It scored
-467 mission-active frames and 868 predictions at 57.6% macro precision and
-58.5% macro recall, with 168.5 ms average runtime latency. This is below the
-80%/80% demonstration promotion gate, so v6 remains an evaluated candidate,
-not the live mission detector. The report is persisted at
-`evaluations/shadow-v6/report.json` on the retained ML PVC.
+The perception validator is an optional scorekeeper. It may read
+`/drone/target_truth` only to calculate offline IoU-based precision and recall;
+it never feeds truth into the detector or mission controller. A live v7 mission
+has completed successfully with all seven targets detected, CUDA enabled, and
+approximately 12.9 ms inference latency.
 
-Next implementation step: improve the v6 detector against this fixed shadow
-benchmark—starting with the weak `well`, `greenhouse`, and `water_tank` classes—
-then retrain/export a new version and repeat the same `all` mission. Do not
-change the existing auto-labeling logic while doing this calibration work.
+The ONNX export/runtime experiment produced reshape errors and has been moved to
+`archived/onnx/`. It is not part of the active workflow. The next gate is a
+formal GPU-backed perception-validation report for v7, followed by updating the
+farm observer image to consume the new detection message schema if the live
+detection stream needs to be shown there.
 
 ## Data persistence and reset policy
 
@@ -111,9 +105,10 @@ Model Registry, signing, or GitOps infrastructure. Those can come later.
 
 ## Free/open workflow
 
-Use the free PyTorch/torchvision baseline already in this repository, with ONNX
-Runtime as the planned inference target. Verify the license of any pretrained
-weights separately.
+Use the free PyTorch/torchvision Faster R-CNN baseline already in this
+repository and run the trained checkpoint directly with CUDA. Verify the
+license of any pretrained weights separately. ONNX is archived until there is
+a specific need to revisit its export/runtime compatibility.
 Do not choose Ultralytics by default: its current free path is AGPL-3.0, while
 private or proprietary use may require an Enterprise license.
 
@@ -151,7 +146,7 @@ Each version should produce:
 
 The showcase viewer is available from the `farm-drone-ml-data-viewer` Route in
 `arhkp1-farm-drone-ml`, or locally with a port-forward to its Service. It starts
-empty and will populate as the recorder, trainer, and evaluator write versioned
+empty and will populate as the recorder, trainer, and perception validator write versioned
 artifacts to the ML volume.
 
 ### Acceptance gates
@@ -189,7 +184,7 @@ show baseline mission
   -> inspect images with projected labels
   -> show dataset manifest and train the free baseline
   -> show held-out evaluation report
-  -> deploy the versioned ONNX model
+  -> deploy the versioned PyTorch model on the GPU
   -> run the same mission using camera inference
   -> show live detections and final mission report
   -> optionally uninstall/reinstall farm and show ML artifacts remain
@@ -240,18 +235,18 @@ Deliverable: a small dataset and a script that can reproduce it.
 
 ### Phase 2 — Train and evaluate a free baseline
 
-Use a free torchvision Faster R-CNN baseline first, then move to an Apache-2.0
-detector stack such as YOLOX or Detectron2, and train on the synthetic dataset.
-Export the promoted model to ONNX. Run offline evaluation on a
-held-out seed set and record per-class precision, recall, missed detections, false
-positives, pose error, and inference latency.
+Use the free torchvision Faster R-CNN baseline first, then consider another
+open detector stack only if the baseline is insufficient. Train on the
+synthetic dataset and run offline evaluation on a held-out seed set. Record
+per-class precision, recall, missed detections, false positives, pose error, and
+inference latency.
 
 Deliverable: a versioned model artifact and a reproducible evaluation JSON/report.
 
 ### Phase 3 — Add runtime inference
 
-Add a `vision_detector` ROS node that loads the ONNX model with ONNX Runtime and
-subscribes to `/drone/camera/image_raw`. It publishes real detections without
+Add a `vision_detector` ROS node that loads the versioned PyTorch checkpoint on
+the GPU and subscribes to `/drone/camera/image_raw`. It publishes real detections without
 subscribing to `/drone/target_truth`.
 
 The observer should consume those detections during `INSPECT`, wait for a bounded

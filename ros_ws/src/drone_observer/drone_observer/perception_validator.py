@@ -1,4 +1,4 @@
-"""Offline-only evaluator for camera detector predictions.
+"""Offline-only validator for camera detector predictions.
 
 This node is deliberately separate from runtime inference. It may subscribe to
 simulator truth for scoring, but it never publishes mission detections or feeds
@@ -31,25 +31,25 @@ def iou(left, right):
     return intersection / union if union else 0.0
 
 
-class ShadowEvaluator(Node):
+class PerceptionValidator(Node):
     def __init__(self):
-        super().__init__('shadow_evaluator')
+        super().__init__('perception_validator')
         scenario_file = str(self.declare_parameter(
             'scenario_file', os.environ.get('DRONE_SCENARIO_FILE', '/opt/drone-demo/config/scenarios.yaml')
         ).value)
         self.output_path = Path(self.declare_parameter(
             'output_path', os.environ.get(
-                'DRONE_SHADOW_REPORT', '/data/perception/evaluations/shadow-v6/report.json'
+                'DRONE_VALIDATOR_REPORT', '/data/perception/evaluations/perception-v7/report.json'
             )
         ).value)
         self.duration_sec = float(self.declare_parameter(
-            'duration_sec', float(os.environ.get('DRONE_SHADOW_DURATION_SEC', '240'))
+            'duration_sec', float(os.environ.get('DRONE_VALIDATOR_DURATION_SEC', '240'))
         ).value)
         self.iou_threshold = float(self.declare_parameter(
-            'iou_threshold', float(os.environ.get('DRONE_SHADOW_IOU_THRESHOLD', '0.5'))
+            'iou_threshold', float(os.environ.get('DRONE_VALIDATOR_IOU_THRESHOLD', '0.5'))
         ).value)
         self.model_version = str(self.declare_parameter(
-            'model_version', os.environ.get('DRONE_SHADOW_MODEL_VERSION', 'v6')
+            'model_version', os.environ.get('DRONE_VALIDATOR_MODEL_VERSION', 'v7')
         ).value)
         with open(scenario_file, encoding='utf-8') as stream:
             self.config = yaml.safe_load(stream)
@@ -72,6 +72,7 @@ class ShadowEvaluator(Node):
         self.mission_active = False
         self.frames = 0
         self.predictions = 0
+        self.inference_errors = 0
         self.latencies = []
         self.stats = {name: {'tp': 0, 'fp': 0, 'fn': 0} for name in self.class_names}
         self.create_subscription(CameraInfo, '/drone/camera/camera_info', self.on_camera, 10)
@@ -80,7 +81,9 @@ class ShadowEvaluator(Node):
         self.create_subscription(TargetDetectionArray, '/drone/camera_detections', self.on_predictions, 10)
         self.create_subscription(String, '/drone/mission_state', self.on_mission_state, 10)
         self.create_timer(1.0, self.on_timer)
-        self.get_logger().info(f'Shadow evaluator ready: output={self.output_path}, duration={self.duration_sec}s')
+        self.get_logger().info(
+            f'Perception validator ready: output={self.output_path}, duration={self.duration_sec}s'
+        )
 
     def on_camera(self, message):
         width, height = int(message.width), int(message.height)
@@ -121,6 +124,10 @@ class ShadowEvaluator(Node):
     def on_predictions(self, message):
         if not self.mission_active:
             return
+        self.frames += 1
+        self.latencies.append(float(message.inference_latency_ms))
+        if not message.inference_ok:
+            self.inference_errors += 1
         truths = self.truth_boxes()
         predictions = []
         for detection in message.detections:
@@ -143,8 +150,6 @@ class ShadowEvaluator(Node):
         for index, (name, _box) in enumerate(truths):
             if index not in matched and name in self.stats:
                 self.stats[name]['fn'] += 1
-        self.frames += 1
-        self.latencies.append(float(message.inference_latency_ms))
 
     def on_timer(self):
         if not self.finished and time.monotonic() - self.started >= self.duration_sec:
@@ -163,7 +168,7 @@ class ShadowEvaluator(Node):
             precisions.append(precision)
             recalls.append(recall)
         report = {
-            'schema_version': 'shadow-evaluation-report-1',
+            'schema_version': 'perception-validation-report-1',
             'model_version': self.model_version,
             'source_topic': '/drone/camera_detections',
             'truth_topic': '/drone/target_truth',
@@ -171,6 +176,7 @@ class ShadowEvaluator(Node):
             'iou_threshold': self.iou_threshold,
             'frames': self.frames,
             'predictions': self.predictions,
+            'inference_errors': self.inference_errors,
             'macro_precision': sum(precisions) / max(1, len(precisions)),
             'macro_recall': sum(recalls) / max(1, len(recalls)),
             'inference_latency_ms': sum(self.latencies) / max(1, len(self.latencies)),
@@ -178,12 +184,12 @@ class ShadowEvaluator(Node):
         }
         self.output_path.parent.mkdir(parents=True, exist_ok=True)
         self.output_path.write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
-        self.get_logger().info(json.dumps({'event': 'shadow_evaluation_complete', **report}, indent=2))
+        self.get_logger().info(json.dumps({'event': 'perception_validation_complete', **report}, indent=2))
 
 
 def main(args=None):
     rclpy.init(args=args)
-    node = ShadowEvaluator()
+    node = PerceptionValidator()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

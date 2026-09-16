@@ -22,6 +22,14 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: perception-showcase
     spec:
+      {{- with ((.Values.placement | default dict).nodeSelector) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with ((.Values.placement | default dict).tolerations) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: viewer
           image: {{ default "registry.access.redhat.com/ubi9/python-311:latest" $viewer.image | quote }}

@@ -5,7 +5,8 @@ FROM ${REGISTRY}/hbr-ros-base:${BASE_TAG} AS build
 
 USER 0
 ARG ROS_DISTRO=jazzy
-RUN micromamba install -y -n ros_env -c robostack-${ROS_DISTRO} -c conda-forge pyyaml numpy onnxruntime ros-${ROS_DISTRO}-ros-gz-interfaces ros-${ROS_DISTRO}-navigation2 ros-${ROS_DISTRO}-nav2-bringup && \
+RUN micromamba install -y -n ros_env -c robostack-${ROS_DISTRO} -c conda-forge pyyaml numpy pip ros-${ROS_DISTRO}-ros-gz-interfaces ros-${ROS_DISTRO}-navigation2 ros-${ROS_DISTRO}-nav2-bringup && \
+    /opt/micromamba/envs/ros_env/bin/python -m pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu121 torch==2.5.1 torchvision==0.20.1 && \
     micromamba clean -a -y
 COPY ros_ws/src /opt/drone_ws/src
 RUN bash -c "source ${ROS_ENV_SETUP} && colcon build --base-paths /opt/drone_ws/src --merge-install --install-base /opt/drone_ws/install"

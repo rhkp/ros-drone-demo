@@ -1,15 +1,15 @@
-"""Camera-only ONNX detector for shadow-mode perception validation.
+"""Camera-only Faster R-CNN detector for live perception.
 
-This node deliberately subscribes only to the camera image topic. It publishes
-to a separate detection topic so it cannot change the existing truth-driven
-mission behavior while the model is being evaluated.
+This node deliberately subscribes only to the camera image topic and publishes
+predictions to a separate topic. It cannot change the existing mission
+behavior, and it runs the trained PyTorch checkpoint directly on the GPU when
+one is available.
 """
 
 import os
 import time
 
 import numpy as np
-import onnxruntime as ort
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
@@ -22,7 +22,7 @@ class VisionDetector(Node):
     def __init__(self):
         super().__init__('vision_detector')
         model_path = self.declare_parameter(
-            'model_path', os.environ.get('DRONE_MODEL_PATH', '/data/perception/models/v6/detector.onnx')
+            'model_path', os.environ.get('DRONE_MODEL_PATH', '/data/perception/models/v7/detector.pt')
         ).value
         class_names = self.declare_parameter(
             'class_names', os.environ.get(
@@ -42,14 +42,23 @@ class VisionDetector(Node):
         ).value)
         self.input_width = int(self.declare_parameter('input_width', 320).value)
         self.input_height = int(self.declare_parameter('input_height', 240).value)
-        self.session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
-        self.input_name = self.session.get_inputs()[0].name
+        import torch
+        from torchvision.models.detection import fasterrcnn_mobilenet_v3_large_320_fpn
+
+        checkpoint = torch.load(model_path, map_location='cpu', weights_only=False)
+        self.torch = torch
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.detector = fasterrcnn_mobilenet_v3_large_320_fpn(
+            weights=None, weights_backbone=None, num_classes=len(self.class_names) + 1,
+        )
+        self.detector.load_state_dict(checkpoint['state_dict'])
+        self.detector.to(self.device).eval()
         self.output = self.create_publisher(TargetDetectionArray, self.output_topic, 10)
         self.create_subscription(Image, '/drone/camera/image_raw', self.on_image, 10)
         self.frame_count = 0
         self.get_logger().info(
             f'Camera-only detector ready: model={model_path}, version={self.model_version}, '
-            f'output={self.output_topic}, classes={self.class_names}'
+            f'runtime=pytorch, device={self.device}, output={self.output_topic}, classes={self.class_names}'
         )
 
     def tensor_from_image(self, message):
@@ -66,11 +75,21 @@ class VisionDetector(Node):
         started = time.perf_counter()
         try:
             tensor, original_width, original_height = self.tensor_from_image(message)
-            # The torchvision export wraps one image as a list and therefore
-            # exposes a single CHW tensor rather than a batched NCHW tensor.
-            boxes, labels, scores = self.session.run(None, {self.input_name: tensor[0]})
+            image_tensor = self.torch.from_numpy(tensor[0]).to(self.device)
+            with self.torch.no_grad():
+                prediction = self.detector([image_tensor])[0]
+            boxes = prediction['boxes'].detach().cpu().numpy()
+            labels = prediction['labels'].detach().cpu().numpy()
+            scores = prediction['scores'].detach().cpu().numpy()
         except Exception as error:
             self.get_logger().error(f'Unable to infer camera frame: {error}')
+            failed = TargetDetectionArray()
+            failed.header = message.header
+            failed.model_version = self.model_version
+            failed.inference_latency_ms = (time.perf_counter() - started) * 1000.0
+            failed.inference_ok = False
+            failed.inference_error = str(error)[:512]
+            self.output.publish(failed)
             return
         scale_x = original_width / float(self.input_width)
         scale_y = original_height / float(self.input_height)
@@ -99,6 +118,7 @@ class VisionDetector(Node):
         result.detections = detections
         result.inference_latency_ms = (time.perf_counter() - started) * 1000.0
         result.model_version = self.model_version
+        result.inference_ok = True
         self.output.publish(result)
         latency_ms = result.inference_latency_ms
         self.get_logger().debug(f'frame={self.frame_count} detections={len(detections)} latency_ms={latency_ms:.2f}')

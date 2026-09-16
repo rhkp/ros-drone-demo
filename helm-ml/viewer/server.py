@@ -18,7 +18,7 @@ from urllib.parse import unquote, urlparse
 DATA_ROOT = Path(os.environ.get("DATA_ROOT", "/data/perception")).resolve()
 PORT = int(os.environ.get("PORT", "8080"))
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
-MODEL_SUFFIXES = {".onnx", ".pt", ".engine"}
+MODEL_SUFFIXES = {".pt", ".engine"}
 
 
 def relative(path):
@@ -230,7 +230,7 @@ async function refresh() {
     document.querySelector('#eval-count').textContent = data.evaluations.length;
     document.querySelector('#root').textContent = data.data_root_exists ? 'Ready' : 'Missing';
     document.querySelector('#datasets').innerHTML = data.datasets.length ? table(['Version','Images','Labels','Seed','Manifest'], data.datasets.map(d=>`<tr><td><code>${value(d.name)}</code></td><td>${value(d.images)}</td><td>${value(d.labels)}</td><td>${value(d.seed)}</td><td>${link(d.manifest,'view JSON')}</td></tr>`)) : '<div class="empty">No datasets recorded yet.</div>';
-    document.querySelector('#models').innerHTML = data.models.length ? table(['Version','ONNX / model files','Manifest'], data.models.map(m=>`<tr><td><code>${value(m.version || m.name)}</code></td><td>${m.files.map(f=>link(f.path, `${f.path.split('/').pop()} (${f.bytes} bytes)`)).join('<br>') || '—'}</td><td>${link(m.manifest,'view JSON')}</td></tr>`)) : '<div class="empty">No models trained yet.</div>';
+    document.querySelector('#models').innerHTML = data.models.length ? table(['Version','PyTorch model files','Manifest'], data.models.map(m=>`<tr><td><code>${value(m.version || m.name)}</code></td><td>${m.files.map(f=>link(f.path, `${f.path.split('/').pop()} (${f.bytes} bytes)`)).join('<br>') || '—'}</td><td>${link(m.manifest,'view JSON')}</td></tr>`)) : '<div class="empty">No models trained yet.</div>';
     document.querySelector('#evaluations').innerHTML = data.evaluations.length ? table(['Run','Model','Precision','Recall','Latency','Report'], data.evaluations.map(e=>`<tr><td><code>${value(e.name)}</code></td><td>${value(e.model_version)}</td><td>${value(e.precision)}</td><td>${value(e.recall)}</td><td>${value(e.latency_ms)} ms</td><td>${link(e.report,'view JSON')}</td></tr>`)) : '<div class="empty">No evaluation reports yet.</div>';
     populateDatasetSelect(data.datasets);
   } catch (error) { document.querySelector('#status').textContent = 'Viewer error'; document.querySelector('#status').className = 'pill error'; }
