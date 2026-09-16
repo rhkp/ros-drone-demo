@@ -137,13 +137,44 @@ def summarize_evaluation(directory):
     }
 
 
+def summarize_run(directory):
+    record_path = directory / "run.json"
+    record = read_json(record_path)
+    if not isinstance(record, dict):
+        return None
+    stages = record.get("stages") if isinstance(record.get("stages"), dict) else {}
+    curation = stages.get("curation") if isinstance(stages.get("curation"), dict) else {}
+    training = stages.get("training") if isinstance(stages.get("training"), dict) else {}
+    evaluation = stages.get("evaluation") if isinstance(stages.get("evaluation"), dict) else {}
+    gate = evaluation.get("promotion_gate") if isinstance(evaluation.get("promotion_gate"), dict) else {}
+    return {
+        "name": directory.name,
+        "run_id": record.get("run_id", directory.name),
+        "status": record.get("status", "unknown"),
+        "started_at": record.get("started_at"),
+        "completed_at": record.get("completed_at"),
+        "curation_status": curation.get("status"),
+        "training_status": training.get("status"),
+        "evaluation_status": evaluation.get("status"),
+        "dataset": curation.get("dataset"),
+        "model": training.get("model"),
+        "report": evaluation.get("report"),
+        "precision": evaluation.get("macro_precision"),
+        "recall": evaluation.get("macro_recall"),
+        "gate_passed": gate.get("passed"),
+        "record": relative(record_path),
+    }
+
+
 def build_summary():
     datasets_root = DATA_ROOT / "datasets"
     models_root = DATA_ROOT / "models"
     evaluations_root = DATA_ROOT / "evaluations"
+    runs_root = DATA_ROOT / "runs"
     datasets = [summarize_dataset(item) for item in sorted(datasets_root.iterdir()) if item.is_dir()] if datasets_root.is_dir() else []
     models = [summarize_model(item) for item in sorted(models_root.iterdir()) if item.is_dir()] if models_root.is_dir() else []
     evaluations = [summarize_evaluation(item) for item in sorted(evaluations_root.iterdir()) if item.is_dir()] if evaluations_root.is_dir() else []
+    runs = [summary for item in sorted(runs_root.iterdir(), reverse=True) if item.is_dir() for summary in [summarize_run(item)] if summary] if runs_root.is_dir() else []
     images = files_under(datasets_root, IMAGE_SUFFIXES)[:30]
     return {
         "data_root": str(DATA_ROOT),
@@ -151,6 +182,7 @@ def build_summary():
         "datasets": datasets,
         "models": models,
         "evaluations": evaluations,
+        "runs": runs,
         "images": [
             {"path": relative(item), "name": item.name}
             for item in images
@@ -179,7 +211,8 @@ code, pre { color:#c8e7d5; } code { word-break:break-word; } a { color:#8ac7ff; 
 <body>
 <header><h1>Farm Drone ML Showcase</h1><p>Human-friendly view of the perception flywheel: datasets → models → evaluation → mission.</p><span id="status" class="pill">Loading artifacts…</span></header>
 <main>
-<div class="grid"><div class="card"><div class="label">Dataset versions</div><div id="dataset-count" class="metric">—</div></div><div class="card"><div class="label">Model versions</div><div id="model-count" class="metric">—</div></div><div class="card"><div class="label">Evaluation reports</div><div id="eval-count" class="metric">—</div></div><div class="card"><div class="label">Persistent store</div><div id="root" class="metric">—</div></div></div>
+<div class="grid"><div class="card"><div class="label">Pipeline runs</div><div id="run-count" class="metric">—</div></div><div class="card"><div class="label">Dataset versions</div><div id="dataset-count" class="metric">—</div></div><div class="card"><div class="label">Model versions</div><div id="model-count" class="metric">—</div></div><div class="card"><div class="label">Evaluation reports</div><div id="eval-count" class="metric">—</div></div><div class="card"><div class="label">Persistent store</div><div id="root" class="metric">—</div></div></div>
+<section><h2>Pipeline runs</h2><p>Each command-triggered retraining run is recorded on the persistent ML volume, including stage status and promotion outcome.</p><div id="runs" class="empty">No pipeline runs recorded yet.</div></section><br>
 <section><h2>Datasets</h2><div id="datasets" class="empty">No datasets recorded yet.</div></section><br>
 <section><h2>Models</h2><div id="models" class="empty">No models trained yet.</div></section><br>
 <section><h2>Evaluation</h2><div id="evaluations" class="empty">No evaluation reports yet.</div></section><br>
@@ -234,10 +267,12 @@ async function refresh() {
   try {
     const data = await fetch('/api/summary', {cache:'no-store'}).then(r => r.json());
     document.querySelector('#status').textContent = data.data_root_exists ? 'ML volume connected' : 'ML volume not mounted';
+    document.querySelector('#run-count').textContent = data.runs.length;
     document.querySelector('#dataset-count').textContent = data.datasets.length;
     document.querySelector('#model-count').textContent = data.models.length;
     document.querySelector('#eval-count').textContent = data.evaluations.length;
     document.querySelector('#root').textContent = data.data_root_exists ? 'Ready' : 'Missing';
+    document.querySelector('#runs').innerHTML = data.runs.length ? table(['Run','Status','Curation','Training','Evaluation','Precision','Recall','Gate','Record'], data.runs.map(r=>`<tr><td><code>${value(r.run_id)}</code><br><span class="label">${value(r.started_at)}</span></td><td>${value(r.status)}</td><td>${value(r.curation_status)}</td><td>${value(r.training_status)}</td><td>${value(r.evaluation_status)}</td><td>${value(r.precision)}</td><td>${value(r.recall)}</td><td>${r.gate_passed === true ? 'passed' : r.gate_passed === false ? 'rejected' : '—'}</td><td>${link(r.record,'view run.json')}</td></tr>`)) : '<div class="empty">No pipeline runs recorded yet.</div>';
     document.querySelector('#datasets').innerHTML = data.datasets.length ? table(['Version','Images','Labels','Seed','Manifest'], data.datasets.map(d=>`<tr><td><code>${value(d.name)}</code></td><td>${value(d.images)}</td><td>${value(d.labels)}</td><td>${value(d.seed)}</td><td>${link(d.manifest,'view JSON')}</td></tr>`)) : '<div class="empty">No datasets recorded yet.</div>';
     document.querySelector('#models').innerHTML = data.models.length ? table(['Version','PyTorch model files','Manifest'], data.models.map(m=>`<tr><td><code>${value(m.version || m.name)}</code></td><td>${m.files.map(f=>link(f.path, `${f.path.split('/').pop()} (${f.bytes} bytes)`)).join('<br>') || '—'}</td><td>${link(m.manifest,'view JSON')}</td></tr>`)) : '<div class="empty">No models trained yet.</div>';
     document.querySelector('#evaluations').innerHTML = data.evaluations.length ? table(['Run','Model','Precision','Recall','Latency','Report'], data.evaluations.map(e=>`<tr><td><code>${value(e.name)}</code></td><td>${value(e.model_version)}</td><td>${value(e.precision)}</td><td>${value(e.recall)}</td><td>${value(e.latency_ms)} ms</td><td>${link(e.report,'view JSON')}</td></tr>`)) : '<div class="empty">No evaluation reports yet.</div>';

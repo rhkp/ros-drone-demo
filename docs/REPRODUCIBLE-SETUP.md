@@ -280,6 +280,25 @@ starting promotion gate passed: 80% macro precision, 80% macro recall, and at
 least 60% recall for every class. Use `--enforce-thresholds` when a failing
 report should return a non-zero exit code.
 
+To run the complete automated retraining path after adding a dedicated test
+episode, use the repository orchestrator:
+
+```bash
+SOURCE_DATASETS_JSON='["flight-v3","flight-v4","flight-v5","flight-v6","flight-test-v1"]' \
+SPLIT_MAP_JSON='{"flight-v3":"train","flight-v4":"train","flight-v5":"validation","flight-v6":"train","flight-test-v1":"test"}' \
+MODEL_VERSION=model-$(date +%Y%m%d-%H%M%S) \
+./scripts/retrain-model.sh
+```
+
+It runs curation, training, held-out evaluation, and conditional promotion in
+that order. A failed gate preserves the previous deployed model and leaves the
+new dataset/model/report on the ML PVC for diagnosis.
+
+The same run writes a persistent record under
+`/data/perception/runs/<run-id>/run.json`. Open the Showcase and use Pipeline
+runs to review the stage statuses and promotion outcome after the temporary
+OpenShift Jobs have been removed.
+
 ## Safe reinstall and data preservation
 
 Both PVC templates use `helm.sh/resource-policy: keep`. To recreate workloads

@@ -69,6 +69,9 @@ recorder:
 curator:
   enabled: false
   image: registry.access.redhat.com/ubi9/python-311:latest
+  # Set by scripts/retrain-model.sh for persistent pipeline-run history.
+  runId: ""
+  runRecordPath: /data/perception/runs/latest/run.json
   sources: [flight-v3, flight-v4, flight-crops-v1, flight-water-v1, flight-v5, flight-v6]
   outputDir: /data/perception/datasets/curated-v6
   negativeRatio: 0.35
@@ -84,6 +87,8 @@ curator:
 trainer:
   enabled: false
   image: pytorch/pytorch:2.4.1-cuda12.1-cudnn9-runtime
+  runId: ""
+  runRecordPath: /data/perception/runs/latest/run.json
   datasetDir: /data/perception/datasets/curated-v6
   modelDir: /data/perception/models/v6
   evalDir: /data/perception/evaluations/v6
@@ -102,6 +107,8 @@ trainer:
 heldOutEvaluator:
   enabled: false
   image: pytorch/pytorch:2.4.1-cuda12.1-cudnn9-runtime
+  runId: ""
+  runRecordPath: /data/perception/runs/latest/run.json
   datasetDir: /data/perception/datasets/curated-v7
   split: test
   modelPath: /data/perception/models/v7/detector.pt

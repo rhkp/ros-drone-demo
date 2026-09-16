@@ -11,8 +11,15 @@ import hashlib
 import json
 import os
 import shutil
+import sys
 from itertools import product
 from pathlib import Path
+
+try:
+    from run_ledger import mark_run, mark_stage
+except ModuleNotFoundError:  # Local tests import this file from the repository.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "common"))
+    from run_ledger import mark_run, mark_stage
 
 
 DATA_ROOT = Path(os.environ.get("DATA_ROOT", "/data/perception")).resolve()
@@ -130,7 +137,7 @@ def copy_frame(source, output, stem, split, label_payload):
     )
 
 
-def main():
+def _run():
     if OUTPUT_DIR.exists():
         raise RuntimeError(f"Refusing to overwrite existing curated dataset: {OUTPUT_DIR}")
     OUTPUT_DIR.mkdir(parents=True)
@@ -216,7 +223,24 @@ def main():
         },
     }
     (OUTPUT_DIR / "dataset_manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    mark_stage(
+        "curation",
+        "completed",
+        dataset=str(OUTPUT_DIR),
+        frames=manifest["frames_after_curation"],
+        split_counts=manifest["split_counts"],
+    )
     print(json.dumps(manifest, indent=2), flush=True)
+
+
+def main():
+    mark_stage("curation", "running", dataset=str(OUTPUT_DIR), sources=SOURCE_NAMES)
+    try:
+        _run()
+    except Exception as error:
+        mark_stage("curation", "failed", error=str(error))
+        mark_run("failed", failure_stage="curation", error=str(error))
+        raise
 
 
 if __name__ == "__main__":

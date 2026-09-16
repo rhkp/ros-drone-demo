@@ -8,6 +8,8 @@ metadata:
     {{- include "farm-drone-ml-data.labels" . | nindent 4 }}
     app.kubernetes.io/component: dataset-curator
 data:
+  run_ledger.py: |-
+{{ .Files.Get "common/run_ledger.py" | indent 4 }}
   assemble_dataset.py: |-
 {{ .Files.Get "labeling/assemble_dataset.py" | indent 4 }}
 {{- end }}

@@ -35,17 +35,10 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      affinity:
-        podAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - key: app.kubernetes.io/name
-                    operator: In
-                    values:
-                      - {{ include "farm-drone-ml-data.name" . }}-viewer
-                      - {{ include "farm-drone-ml-data.name" . }}-storage-anchor
-              topologyKey: kubernetes.io/hostname
+      # The detector is the GPU consumer. Do not require it to share a node
+      # with the viewer/anchor: during retraining those pods are intentionally
+      # stopped, and their previous node may not have an allocatable GPU.
+      # The PVC's own node affinity keeps the read-only data mount consistent.
       containers:
         - name: detector
           image: {{ default "quay.io/rhkp/hbr-drone-observer:v0.9.0" $detector.image | quote }}

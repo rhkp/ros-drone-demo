@@ -4,6 +4,7 @@
 import json
 import os
 import random
+import sys
 import time
 from pathlib import Path
 
@@ -11,6 +12,12 @@ import torch
 from PIL import Image, ImageOps
 from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
 from torchvision.models.detection import fasterrcnn_mobilenet_v3_large_320_fpn
+
+try:
+    from run_ledger import mark_run, mark_stage
+except ModuleNotFoundError:  # Local tests import this file from the repository.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "common"))
+    from run_ledger import mark_run, mark_stage
 
 
 DATASET_DIR = Path(os.environ.get("DATASET_DIR", "/data/perception/datasets/curated-v2"))
@@ -167,7 +174,7 @@ def evaluate(model, loader, device):
     }
 
 
-def main():
+def _run():
     random.seed(SEED)
     torch.manual_seed(SEED)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -207,7 +214,27 @@ def main():
     report = {"schema_version": "evaluation-report-1", "model_version": model_version, "dataset": str(DATASET_DIR), "device": str(device), "class_names": CLASS_NAMES, "training_history": history, **metrics}
     (MODEL_DIR / "model_manifest.json").write_text(json.dumps({"schema_version": "model-manifest-1", "model_version": model_version, "format": "pytorch-state-dict", "artifact": str(checkpoint_path), "class_names": CLASS_NAMES, "dataset": str(DATASET_DIR), "device": str(device)}, indent=2) + "\n", encoding="utf-8")
     (EVAL_DIR / "report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    mark_stage(
+        "training",
+        "completed",
+        dataset=str(DATASET_DIR),
+        model=str(checkpoint_path),
+        evaluation=str(EVAL_DIR / "report.json"),
+        device=str(device),
+        macro_precision=metrics["macro_precision"],
+        macro_recall=metrics["macro_recall"],
+    )
     print(json.dumps({"event": "training_complete", "model": str(checkpoint_path), "report": str(EVAL_DIR / "report.json"), **metrics}, indent=2), flush=True)
+
+
+def main():
+    mark_stage("training", "running", dataset=str(DATASET_DIR), model=str(MODEL_DIR))
+    try:
+        _run()
+    except Exception as error:
+        mark_stage("training", "failed", error=str(error))
+        mark_run("failed", failure_stage="training", error=str(error))
+        raise
 
 
 if __name__ == "__main__":

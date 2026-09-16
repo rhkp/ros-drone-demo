@@ -20,6 +20,17 @@ spec:
       restartPolicy: Never
       securityContext:
         runAsNonRoot: true
+      # The ML PVC is provisioned on the GPU node and that node is tainted.
+      # Keep the CPU-only curator colocated with the PVC consumers so the
+      # one-shot Job can mount the same RWO volume reliably.
+      {{- with ((.Values.placement | default dict).nodeSelector) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with ((.Values.placement | default dict).tolerations) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       # The ML PVC is RWO; keep the one-shot job with its existing consumers.
       affinity:
         podAffinity:
@@ -38,6 +49,10 @@ spec:
           imagePullPolicy: IfNotPresent
           command: ["python3", "/opt/curator/assemble_dataset.py"]
           env:
+            - name: RUN_ID
+              value: {{ default "" $curator.runId | quote }}
+            - name: RUN_RECORD_PATH
+              value: {{ default "" $curator.runRecordPath | quote }}
             - name: DATA_ROOT
               value: {{ default "/data/perception" .Values.dataPath | quote }}
             - name: SOURCE_DATASETS

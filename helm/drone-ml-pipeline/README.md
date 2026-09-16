@@ -189,6 +189,33 @@ helm upgrade farm-drone-ml-data ./helm/drone-ml-pipeline \
   --wait
 ```
 
+## Automated retraining and promotion
+
+Once a new complete test episode exists, the repository can run the full
+flywheel with one command:
+
+```bash
+SOURCE_DATASETS_JSON='["flight-v3","flight-v4","flight-v5","flight-v6","flight-test-v1"]' \
+SPLIT_MAP_JSON='{"flight-v3":"train","flight-v4":"train","flight-v5":"validation","flight-v6":"train","flight-test-v1":"test"}' \
+MODEL_VERSION=model-$(date +%Y%m%d-%H%M%S) \
+./scripts/retrain-model.sh
+```
+
+The orchestrator creates a new immutable curated dataset, starts GPU training,
+runs the evaluator on `split=test`, and deploys the new checkpoint only when
+the promotion gate passes. If training or evaluation fails, the new artifacts
+remain available for inspection and the previous detector configuration is
+restored. It does not delete raw flights or the persistent ML PVC.
+
+Every run also writes `runs/<run-id>/run.json` to the persistent ML volume.
+The Showcase exposes these records in its Pipeline runs section, including
+curation, training, evaluation, metrics, and promotion status. This history
+survives the cleanup of the one-shot OpenShift Jobs.
+
+This is intentionally a command-triggered automated flywheel. A future event or
+scheduled trigger can call the same script after data-quality and approval
+controls are established.
+
 ## Live perception validation
 
 Run the validator for a bounded mission window after enabling the detector:

@@ -6,6 +6,7 @@ metadata:
   name: {{ include "farm-drone-ml-data.fullname" . }}-storage-anchor
   labels:
     {{- include "farm-drone-ml-data.labels" . | nindent 4 }}
+    app.kubernetes.io/component: storage-anchor
 spec:
   replicas: 1
   selector:
@@ -17,7 +18,20 @@ spec:
       labels:
         app.kubernetes.io/name: {{ include "farm-drone-ml-data.name" . }}-storage-anchor
         app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: storage-anchor
     spec:
+      # The PVC is RWO and the detector is the GPU consumer. Follow the
+      # detector so the anchor and viewer mount the volume on the same node.
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/name
+                    operator: In
+                    values:
+                      - {{ include "farm-drone-ml-data.name" . }}-detector
+              topologyKey: kubernetes.io/hostname
       {{- with ((.Values.placement | default dict).nodeSelector) }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

@@ -24,23 +24,19 @@ spec:
         {{- toYaml (default (dict "nvidia.com/gpu.present" "true") $evaluator.nodeSelector) | nindent 8 }}
       tolerations:
         {{- toYaml (default (list (dict "key" "g5-gpu" "operator" "Exists" "effect" "NoSchedule")) $evaluator.tolerations) | nindent 8 }}
-      affinity:
-        podAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - key: app.kubernetes.io/name
-                    operator: In
-                    values:
-                      - {{ include "farm-drone-ml-data.name" . }}-viewer
-                      - {{ include "farm-drone-ml-data.name" . }}-storage-anchor
-              topologyKey: kubernetes.io/hostname
+      # The evaluator runs while the detector, viewer, and storage anchor are
+      # disabled to release the single GPU and RWO PVC. Node placement and the
+      # PVC's own node affinity are sufficient for this one-shot Job.
       containers:
         - name: held-out-evaluator
           image: {{ default "pytorch/pytorch:2.4.1-cuda12.1-cudnn9-runtime" $evaluator.image | quote }}
           imagePullPolicy: IfNotPresent
           command: ["python3", "/opt/evaluator/evaluate_detector.py"]
           env:
+            - name: RUN_ID
+              value: {{ default "" $evaluator.runId | quote }}
+            - name: RUN_RECORD_PATH
+              value: {{ default "" $evaluator.runRecordPath | quote }}
             - name: DATASET_DIR
               value: {{ default "/data/perception/datasets/curated-v6" $evaluator.datasetDir | quote }}
             - name: EVAL_SPLIT

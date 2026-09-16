@@ -4,6 +4,7 @@
 import argparse
 import json
 import os
+import sys
 import time
 from pathlib import Path
 
@@ -11,6 +12,12 @@ import torch
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 from torchvision.models.detection import fasterrcnn_mobilenet_v3_large_320_fpn
+
+try:
+    from run_ledger import mark_run, mark_stage
+except ModuleNotFoundError:  # Local tests import this file from the repository.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "common"))
+    from run_ledger import mark_run, mark_stage
 
 
 DEFAULT_CLASSES = (
@@ -174,7 +181,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def main():
+def _run():
     args = parse_args()
     if args.split == "train":
         raise SystemExit("Refusing to evaluate the training split; use validation or test.")
@@ -216,9 +223,35 @@ def main():
     report_path = Path(args.report)
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    mark_stage(
+        "evaluation",
+        "completed",
+        dataset=str(Path(args.dataset)),
+        split=args.split,
+        model=str(Path(args.model)),
+        report=str(report_path),
+        evaluated_images=metrics["evaluated_images"],
+        macro_precision=metrics["macro_precision"],
+        macro_recall=metrics["macro_recall"],
+        promotion_gate=gate,
+    )
     print(json.dumps(report, indent=2), flush=True)
     if args.enforce_thresholds and not gate["passed"]:
+        mark_run("rejected", failure_stage="evaluation", report=str(report_path), promotion_gate=gate)
         raise SystemExit(2)
+    mark_run("candidate_passed", report=str(report_path), promotion_gate=gate)
+
+
+def main():
+    mark_stage("evaluation", "running", dataset=os.environ.get("DATASET_DIR", ""), split=os.environ.get("EVAL_SPLIT", "test"))
+    try:
+        _run()
+    except SystemExit:
+        raise
+    except Exception as error:
+        mark_stage("evaluation", "failed", error=str(error))
+        mark_run("failed", failure_stage="evaluation", error=str(error))
+        raise
 
 
 if __name__ == "__main__":

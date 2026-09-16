@@ -30,6 +30,10 @@ spec:
           imagePullPolicy: IfNotPresent
           command: ["python3", "/opt/trainer/train_detector.py"]
           env:
+            - name: RUN_ID
+              value: {{ default "" $trainer.runId | quote }}
+            - name: RUN_RECORD_PATH
+              value: {{ default "" $trainer.runRecordPath | quote }}
             - name: DATASET_DIR
               value: {{ default "/data/perception/datasets/curated-v2" $trainer.datasetDir | quote }}
             - name: MODEL_DIR

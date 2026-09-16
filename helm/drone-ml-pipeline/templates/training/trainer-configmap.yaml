@@ -8,6 +8,8 @@ metadata:
     {{- include "farm-drone-ml-data.labels" . | nindent 4 }}
     app.kubernetes.io/component: model-trainer
 data:
+  run_ledger.py: |-
+{{ .Files.Get "common/run_ledger.py" | indent 4 }}
   train_detector.py: |-
 {{ .Files.Get "training/train_detector.py" | indent 4 }}
 {{- end }}

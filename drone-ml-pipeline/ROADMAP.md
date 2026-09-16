@@ -289,7 +289,12 @@ Add tests for:
 
 ### Phase 5 — Add the flywheel later
 
-Once detector v1 works locally, add the larger flywheel pieces in this order:
+The first command-triggered flywheel slice is now implemented in
+`scripts/retrain-model.sh`. It runs curation, GPU training, held-out
+evaluation, and conditional model promotion while preserving the previous
+detector when the gate fails. Each run now also writes a persistent
+`runs/<run-id>/run.json` ledger and the Showcase displays its stage history.
+The larger flywheel pieces are still ordered as:
 
 1. mission dataset curation;
 2. reproducible training dataset assembly;
@@ -299,6 +304,22 @@ Once detector v1 works locally, add the larger flywheel pieces in this order:
 6. signing/GitOps rollout if deployment governance becomes a requirement.
 
 Kafka, MinIO, and model signing are not required for the first ML milestone.
+
+## Future feature — OpenShift Pipelines with Tekton
+
+Keep the current command-triggered script as the reproducible baseline. Later,
+model the flywheel as OpenShift-native Tekton resources:
+
+- `Tasks` for flight-data validation, curation, GPU training, held-out
+  evaluation, and conditional promotion;
+- a `Pipeline` and `PipelineRun` for each flywheel execution;
+- persistent run results and artifact references in the ML Showcase; and
+- an optional scheduled or event-based trigger after data-quality controls are
+  established.
+
+Tekton is not part of the current deployment. This roadmap item is separate
+from the later Argo CD GitOps rollout, which would reconcile an approved model
+deployment after promotion.
 
 ## Distant feature — GitOps deployment with Argo CD
 
